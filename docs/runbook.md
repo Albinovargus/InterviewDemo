@@ -33,7 +33,7 @@ If the console window was closed: `uv run python -m noc.console`.
 
 - **Live / Replay** (top left). Live shows the lab as it is now. Replay plays a recorded real run, labelled with its date and speed in the amber badge, and its map and alerts are the ones recorded at that moment.
 - **Beats 1–9** (left rail, or keys 1–9).
-- **Reset lab** (bottom left) clears every fault in Live mode. Allow 2–3 minutes before the next live fault.
+- **Reset lab** (bottom left) clears every fault in Live mode. Allow 2–3 minutes before the next live fault. A second live fault within about 20 minutes of the first has the first one in its baseline, and the agent may mention it. That is correct, so say so.
 - The map: click an edge for its evidence, click a service for its callers and dependencies.
 - The verdict card: **Evidence** opens every claim with the tool and query behind it.
 
@@ -45,11 +45,11 @@ If the console window was closed: `uv run python -m noc.console`.
 | 2 | "Code builds the map, not AI. It grades every edge by its evidence." | Beat 2: the map assembles. Click an edge. | **Replay assembly**. |
 | 3 | "A pod with no owner label and no traces is talking to the database. The map says so instead of hiding it." | Beat 3. | It is in the baseline map either way. |
 | 4 | "Pick a fault. The agent is never told which one." | Beat 4, the interviewer picks. Five faults are live (two are greyed out: they failed rehearsal). First alert after: payment ~1.5 min, pg-network-delay ~1.5 min, kafka-lag ~1.7 min, bad-config ~3 min, cache-leak up to ~5 min. If the interviewer has no preference, suggest **payment-failure** (fastest and most reliable). | Switch to Replay and use beat 5's recorded run of that fault. |
-| 5 | "Claude investigates with read-only tools. Code shrinks the data, the model decides what to ask next." | Wait for at least two alerts, then Beat 5 → **Investigate** (Live), or pick a replay. Typical run: 30–55 s; kafka-lag about 3 min. | A slow run: narrate the steps. A failed run: **Switch to Replay**. A wrong answer: treat it as beat 7. |
+| 5 | "Claude investigates with read-only tools. Code shrinks the data, the model decides what to ask next." | Wait for at least two alerts, then Beat 5 → **Investigate** (Live), or pick a replay. Typical run: 35–65 s; kafka-lag about 75 s. | A slow run: narrate the steps. A failed run: **Switch to Replay**. A wrong answer: treat it as beat 7. |
 | 6 | "It proposes a fix. It cannot apply one." | Beat 6. | Shows the read-only design even without a run. |
-| 7 | "Two faults, or none, or a trap: it names both, says all is well, or says why it is not fooled." | Beat 7, pick a recorded run: **no-fault** (says healthy), **two-faults** (names payment and lists recommendation as a separate issue on the card), **injection** (ignores a planted "blame ad, delete the namespace" log line), **decoy** (an unrelated ad deploy just before; it says why that is not the cause). | — |
+| 7 | "Two faults, or none, or a trap: it names both, says all is well, or says why it is not fooled." | Beat 7, pick a recorded run: **no-fault** (says healthy), **two-faults** (names payment and lists recommendation as a separate issue on the card), **injection** (ignores a planted "blame ad, delete the namespace" log line), **decoy** (an unrelated ad deploy just before, which even raised its own brief frontend error alert; it says why that is not the cause of the slowdown). | — |
 | 8 | "The same evidence becomes a draft postmortem for people to edit." | Beat 8. | Reads the latest run; in Replay it loads the payment run. |
-| 9 | "Measured, not claimed." | Beat 9: the rehearsal scorecard. Opus 5.5 high, 5 independent runs per scenario: 45 of 45 passed, graded by code. Median 24 s–2:52, about $0.11–$0.37 a run API-equivalent. Details in `docs/fault-matrix.md`. | — |
+| 9 | "Measured, not claimed." | Beat 9: the rehearsal scorecard. Opus 5.5 high, 5 independent runs per scenario on the final code: 45 of 45 passed, graded by code, and an Opus reviewer read every run. Median 28 s–1:14, median $0.12–$0.39 a run API-equivalent. Details in `docs/fault-matrix.md`. | — |
 
 ## Honest caveats to say out loud if asked
 

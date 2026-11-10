@@ -94,3 +94,18 @@ def test_client_error_rate_is_a_fraction_of_calls():
     q = tools._signals(["payment"])
     assert " / " in q["client error rate"]
     assert 'group=~"(payment)"' in q["consumer lag"]
+
+
+def test_client_signals_leave_out_the_flag_tooling_streams():
+    from noc import tools
+    q = tools._signals(["payment"])["client error rate"]
+    assert q.count('span_name!~"flagd.*"') == 2  # numerator and denominator
+
+
+def test_a_few_ms_of_p95_wobble_is_not_a_first_mover():
+    from noc import tools
+    from noc.reduce import movers
+    series = {"astronomy-db · p95 latency ms": [(1, 16.0), (2, 950.0)]}
+    got = movers(series, {"astronomy-db · p95 latency ms": 9.95}, rel=0.5, abs_floor=0.02,
+                 per_signal=tools.SIGNAL_THRESHOLDS)
+    assert [(m.first_moved_at, m.moved_to) for m in got] == [(2, 950.0)]
