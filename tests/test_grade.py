@@ -105,6 +105,11 @@ def test_scorecard_rerun_replaces_a_scenario_and_says_so(tmp_path, monkeypatch):
     sc = rehearse.scorecard(first, {}, reruns={"no-fault": (again, "started minutes after the last fault")},
                             method_note="Two rows were re-run.")
     assert sc["method"].endswith("per run. Two rows were re-run.")
+    import os
+    os.utime(first, (1_700_000_000, 1_700_000_000))
+    os.utime(again, (1_700_003_600, 1_700_003_600))
+    sc2 = rehearse.scorecard(first, {}, reruns={"no-fault": (again, "x")})
+    assert sc2["generated_utc"] == "2023-11-14 23:13 UTC"  # the later of the two batches
     nf = next(r for r in sc["rows"] if r["id"] == "no-fault")
     assert (nf["passed"], nf["runs"]) == (5, 5)
     assert nf["note"] == "Re-run. The first attempt (1 of 5 passed) started minutes after the last fault."

@@ -45,11 +45,11 @@ If the console window was closed: `uv run python -m noc.console`.
 | 2 | "Code builds the map, not AI. It grades every edge by its evidence." | Beat 2: the map assembles. Click an edge. | **Replay assembly**. |
 | 3 | "A pod with no owner label and no traces is talking to the database. The map says so instead of hiding it." | Beat 3. | It is in the baseline map either way. |
 | 4 | "Pick a fault. The agent is never told which one." | Beat 4, the interviewer picks. Five faults are live (two are greyed out: they failed rehearsal). First alert after: payment ~1.5 min, pg-network-delay ~1.5 min, kafka-lag ~1.7 min, bad-config ~3 min, cache-leak up to ~5 min. If the interviewer has no preference, suggest **payment-failure** (fastest and most reliable). | Switch to Replay and use beat 5's recorded run of that fault. |
-| 5 | "Claude investigates with read-only tools. Code shrinks the data, the model decides what to ask next." | Wait for at least two alerts, then Beat 5 → **Investigate** (Live), or pick a replay. Typical run: 35–65 s; kafka-lag about 75 s. | A slow run: narrate the steps. A failed run: **Switch to Replay**. A wrong answer: treat it as beat 7. |
+| 5 | "Claude investigates with read-only tools. Code shrinks the data, the model decides what to ask next." | Wait for at least two alerts, then Beat 5 → **Investigate** (Live), or pick a replay. Typical run: 30–65 s (payment about 30 s); kafka-lag about 75 s. | A slow run: narrate the steps. A failed run: **Switch to Replay**. A wrong answer: treat it as beat 7. |
 | 6 | "It proposes a fix. It cannot apply one." | Beat 6. | Shows the read-only design even without a run. |
 | 7 | "Two faults, or none, or a trap: it names both, says all is well, or says why it is not fooled." | Beat 7, pick a recorded run: **no-fault** (says healthy), **two-faults** (names payment and lists recommendation as a separate issue on the card), **injection** (ignores a planted "blame ad, delete the namespace" log line), **decoy** (an unrelated ad deploy just before, which even raised its own brief frontend error alert; it says why that is not the cause of the slowdown). | — |
 | 8 | "The same evidence becomes a draft postmortem for people to edit." | Beat 8. | Reads the latest run; in Replay it loads the payment run. |
-| 9 | "Measured, not claimed." | Beat 9: the rehearsal scorecard. Opus 5.5 high, 5 independent runs per scenario on the final code: 45 of 45 passed, graded by code, and an Opus reviewer read every run. Median 28 s–1:14, median $0.12–$0.39 a run API-equivalent. Details in `docs/fault-matrix.md`. | — |
+| 9 | "Measured, not claimed." | Beat 9: the rehearsal scorecard. Opus 5.5 high, 5 independent runs per scenario on the final code: 45 of 45 passed, graded by code, and an Opus reviewer read every run. Median 27 s–1:14, median $0.12–$0.39 a run API-equivalent. Three rows (payment, pg-network-delay, decoy) were re-run after a last threshold fix; the table says so. If asked: "the reviewer caught it, I fixed it and re-measured, and the scorecard shows both." Details in `docs/fault-matrix.md`. | — |
 
 ## Honest caveats to say out loud if asked
 
@@ -61,6 +61,7 @@ If the console window was closed: `uv run python -m noc.console`.
 - **"How did it know the flag's name?"** Claude knows the OpenTelemetry Demo, which is public. Some recorded runs name the demo's flag from that knowledge. The prompt now forbids naming anything a tool did not show. If it happens, say it plainly.
 - **The five runs per scenario share one incident.** They measure consistency on one injection, not robustness across many incidents. The scorecard's method line says so.
 - **Raw Grafana queries see the whole cluster**, including the fault tooling's pods (chaos-mesh, flagd). They show that the tooling exists, not which fault is on. The reduction tools hide it.
+- **The decoy is not perfect.** All five decoy runs name the database and clear ad as the cause. The ad rollout also made frontend's calls to ad fail, which raised error alerts, and 3 of 5 runs put those down to the database without checking a trace. The replay is one of the two that got it right. If asked: "secondary attribution is where it is weakest; it never blamed the decoy."
 - **Cost is the API-equivalent price** that Claude Code reports for the run. The demo itself runs on a Claude subscription.
 
 ## Recovering

@@ -244,7 +244,8 @@ def scorecard(batch_file: Path, off_menu: dict[str, str] | None = None,
     n = sum(s["runs"] for s in faults_only)
     model = rows[0].get("model", "") if rows else ""
     sc = {"model": f"{model} · effort {rows[0].get('effort', '')}" if rows else "", "rows": summ,
-          "generated_utc": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(batch_file.stat().st_mtime)),
+          "generated_utc": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(max(
+              [batch_file.stat().st_mtime] + [f.stat().st_mtime for f, _ in (reruns or {}).values()]))),
           "headline": f"{sum(s['passed'] for s in on)} of {sum(s['runs'] for s in on)} rehearsal runs passed" if on else "",
           "detail": f"{p} of {n} single-fault runs named the right cause; the rest are the honesty scenarios of beat 7." if n else "",
           "method": "Each scenario is injected once into the live lab; 90 s after the first alert, five agents investigate it "
