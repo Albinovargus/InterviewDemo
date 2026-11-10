@@ -241,15 +241,20 @@ def promote_best(batch_file: Path) -> list[str]:
             out.append(f"{s['id']}: no passing run, nothing promoted")
             continue
         best = min(good, key=lambda r: abs(r["duration_s"] - (s["median_s"] or 0)))
-        sc = SCENARIOS[s["id"]]
-        lines = (RUNS / f"{best['run']}.jsonl").read_text(encoding="utf-8").splitlines()
-        first = json.loads(lines[0])
-        first["meta"].update(title=sc["title"], scenario=s["id"], beat=sc["beat"], label="recorded real run")
-        lines[0] = json.dumps(first)
-        dest = REPLAYS / f"{s['id']}.jsonl"
-        dest.write_text(chr(10).join(lines) + chr(10), encoding="utf-8", newline=chr(10))
-        out.append(f"{s['id']}: {best['run']} ({best['duration_s']}s, {best['reason']}) -> {dest.name}")
+        out.append(f"{s['id']}: {best['run']} ({best['duration_s']}s, {best['reason']}) -> {promote_run(best['run'], s['id']).name}")
     return out
+
+
+def promote_run(run: str, scenario: str) -> Path:
+    """Copy one recorded run into replays/<scenario>.jsonl, titled for the console."""
+    sc = SCENARIOS[scenario]
+    lines = (RUNS / f"{run}.jsonl").read_text(encoding="utf-8").splitlines()
+    first = json.loads(lines[0])
+    first["meta"].update(title=sc["title"], scenario=scenario, beat=sc["beat"], label="recorded real run")
+    lines[0] = json.dumps(first)
+    dest = REPLAYS / f"{scenario}.jsonl"
+    dest.write_text(chr(10).join(lines) + chr(10), encoding="utf-8", newline=chr(10))
+    return dest
 
 
 if __name__ == "__main__":
@@ -262,11 +267,17 @@ if __name__ == "__main__":
     ap.add_argument("--batch", default=None)
     ap.add_argument("--scorecard", default=None, help="batch file to turn into runs/scorecard.json")
     ap.add_argument("--promote", default=None, help="batch file: copy each scenario's representative passing run into replays/")
+    ap.add_argument("--pick", nargs="*", default=None, help="scenario=run-id pairs to promote by hand (judged best)")
     ap.add_argument("--off-menu", default="", help="comma-separated scenario ids shown as off the menu")
     a = ap.parse_args()
     if a.scorecard:
         extra = {k: "taken off the menu after rehearsal" for k in filter(None, a.off_menu.split(","))}
         print(json.dumps(scorecard(Path(a.scorecard), {**off_menu_reasons(), **extra}), indent=2))
+        raise SystemExit(0)
+    if a.pick:
+        for pair in a.pick:
+            sid, run = pair.split("=", 1)
+            print(f"{sid}: {run} -> {promote_run(run, sid).name}")
         raise SystemExit(0)
     if a.promote:
         for line in promote_best(Path(a.promote)):

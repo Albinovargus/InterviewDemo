@@ -48,10 +48,11 @@ def pattern_diff(baseline: dict[str, float], incident: dict[str, float],
 @dataclass
 class Mover:
     signal: str
-    kind: str  # rose | fell | dropped_to_zero | missing
+    kind: str  # rose | fell | dropped_to_zero | missing: describes the FIRST move, to `moved_to`
     baseline: float
     latest: float | None
     first_moved_at: float | None
+    moved_to: float | None = None  # the value when it first left the baseline (latest may differ)
 
 
 def movers(series: dict[str, list[tuple[float, float]]], baseline: dict[str, float],
@@ -73,7 +74,7 @@ def movers(series: dict[str, list[tuple[float, float]]], baseline: dict[str, flo
                 else:
                     kind = "rose" if v > b else "fell"
                 score = abs(v - b) / abs(b) if b else float("inf")
-                out.append((t, -score, Mover(name, kind, b, latest, t)))
+                out.append((t, -score, Mover(name, kind, b, latest, t, v)))
                 break
     out.sort(key=lambda x: (x[0], x[1]))
     return [m for _, _, m in out]

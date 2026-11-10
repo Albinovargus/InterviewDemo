@@ -79,3 +79,11 @@ def test_template_keeps_words_and_settings_without_digits():
 def test_count_templates_groups_lines():
     lines = ["order 1 placed", "order 22 placed", "cache miss for user 9", "order 3 placed"]
     assert count_templates(lines) == {"order <_> placed": 3, "cache miss for user <_>": 1}
+
+
+def test_mover_reports_the_value_it_moved_to_as_well_as_the_latest():
+    # dropped to zero first, then recovered far above baseline: the label must match the value it describes
+    out = movers({"rate": [(1.0, 0.4), (2.0, 0.0), (3.0, 3535.0)]}, {"rate": 0.4})
+    assert len(out) == 1
+    m = out[0]
+    assert (m.kind, m.moved_to, m.latest, m.first_moved_at) == ("dropped_to_zero", 0.0, 3535.0, 2.0)

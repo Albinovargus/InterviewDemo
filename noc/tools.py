@@ -203,7 +203,8 @@ def metric_movers(services: list[str] | None = None, window_minutes: int = 15) -
                 baseline[name] = 0.0  # signal appeared from nothing
             series[name] = inc_pts
     moved = movers(series, baseline, rel=0.5, abs_floor=0.02)
-    rows = [{"signal": m.signal, "change": m.kind, "baseline": round(m.baseline, 3),
+    rows = [{"signal": m.signal, "first_move": m.kind, "baseline": round(m.baseline, 3),
+             "moved_to": None if m.moved_to is None else round(m.moved_to, 3),
              "latest": None if m.latest is None else round(m.latest, 3),
              "first_moved": _ago(m.first_moved_at) if m.first_moved_at else None} for m in moved]
     kept, note = fit(rows, BUDGET - 400, "pass fewer services")
