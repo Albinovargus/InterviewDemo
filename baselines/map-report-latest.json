@@ -1,0 +1,18 @@
+{
+  "summary": "17 of the 21 edges are confirmed by both traces and network flows, 3 are likely, and 1 is unexplained. The one thing to look at is nightly-sync-7f9c, a bare Pod in the default namespace with no owner label, no traces and no Service, which is sending 503 B/s to astronomy-db.",
+  "trust": "The 17 confirmed edges, including the whole frontend-proxy \u2192 frontend \u2192 checkout path and product-catalog \u2192 astronomy-db, are solid because traces and network flows agree on each one and every trace shows 0% errors.",
+  "gaps": [
+    "kafka is not instrumented, so its three inbound edges (from accounting, checkout and fraud-detection) rest on network flows alone, with no traces.",
+    "fraud-detection is not instrumented and has no Service, so the map's only view of it is flow data (1923 B/s to kafka).",
+    "nightly-sync-7f9c is unlabelled, uninstrumented and has no Service, so the map cannot attribute its traffic to astronomy-db to any owner."
+  ],
+  "questions": [
+    "Who owns nightly-sync-7f9c, why is it running as a bare Pod in the default namespace, and is its access to astronomy-db expected?",
+    "Should fraud-detection be instrumented so that its kafka dependency can be confirmed with traces?",
+    "Is the accounting \u2192 kafka edge (2153 B/s, no traces) an expected dependency, given that accounting is instrumented but no spans for it show up?"
+  ],
+  "model": "claude-opus-5-5",
+  "generated_utc": "2026-11-10 08:17 UTC",
+  "baseline_captured_at": 1794291426.8101685,
+  "cost_usd": 0.0641658
+}
