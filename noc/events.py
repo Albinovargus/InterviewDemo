@@ -33,7 +33,7 @@ def extract_verdict(text: str) -> dict | None:
     blocks = _JSON_BLOCK.findall(text or "")
     for raw in reversed(blocks):
         try:
-            d = json.loads(raw)
+            d, _ = json.JSONDecoder().raw_decode(raw)  # tolerate trailing junk such as a stray closing brace
         except json.JSONDecodeError:
             continue
         if isinstance(d, dict) and "status" in d:

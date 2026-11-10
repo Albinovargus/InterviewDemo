@@ -104,3 +104,8 @@ def test_prefetch_results_count_toward_the_counter():
     assert out.type == "counter"
     assert out.data["scanned"] == 22000 and out.data["found"] == 23 and out.data["anomalous"] == 2
     assert out.data["tokens_to_model"] > 0
+
+
+def test_verdict_with_a_stray_closing_brace_still_parses():
+    text = 'Done.\n```json\n{"status": "diagnosed", "primary_cause": {"service": "payment"}, "postmortem": {"a": [1]}}}\n```'
+    assert extract_verdict(text)["primary_cause"]["service"] == "payment"
