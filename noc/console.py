@@ -28,6 +28,8 @@ REPLAYS = clients.ROOT / "replays"
 SCORECARD = REPLAYS / "scorecard.json"  # committed with the replays it summarises
 DEMO_MODEL, DEMO_EFFORT = "claude-opus-5-5", "high"
 IDLE_LIMIT_S = 300  # a live run silent this long is stopped (the runner also caps every run at 12 minutes)
+REPLAY_ORDER = ("payment-failure", "pg-network-delay", "cache-leak", "bad-config", "kafka-lag",  # strongest first
+                "no-fault", "two-faults", "injection", "decoy")
 FAULT_MENU = clients.ROOT / "lab" / "fault-menu.json"  # {"off": {"<fault id>": "<why it is off the menu>"}}
 
 log = logging.getLogger("console")
@@ -129,7 +131,9 @@ def _replay_meta(path: Path) -> dict:
 
 async def replays(_: Request) -> JSONResponse:
     REPLAYS.mkdir(exist_ok=True)
-    items = await asyncio.to_thread(lambda: [_replay_meta(p) for p in sorted(REPLAYS.glob("*.jsonl"))])
+    rank = {k: i for i, k in enumerate(REPLAY_ORDER)}
+    paths = sorted(REPLAYS.glob("*.jsonl"), key=lambda p: (rank.get(p.stem, len(rank)), p.stem))
+    items = await asyncio.to_thread(lambda: [_replay_meta(p) for p in paths])
     return JSONResponse({"replays": items})
 
 
@@ -224,9 +228,10 @@ async def _stream(path: Path, live: RunHandle | None, speed: float):
                 for ev in n.close(ts):
                     ev.data.setdefault("stderr", rec["exit"].get("stderr", "")[-300:])
                     yield _sse(ev.to_dict())
-    for ev in n.close(time.time()):
+    end_ts = prev_ts if prev_ts is not None else time.time()  # a replay ends at its recorded time, not now
+    for ev in n.close(end_ts):
         yield _sse(ev.to_dict())
-    yield _sse({"type": "stream_end", "ts": time.time(), "data": {}})
+    yield _sse({"type": "stream_end", "ts": end_ts, "data": {}})
 
 
 def _sse_response(gen) -> StreamingResponse:

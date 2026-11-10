@@ -214,12 +214,14 @@ def scorecard(batch_file: Path, off_menu: dict[str, str] | None = None) -> dict:
         if not s["on_menu"]:
             s["off_reason"] = off_menu[s["id"]]
     faults_only = [s for s in summ if SCENARIOS[s["id"]]["kind"] == "fault" and s["id"] in faults.FAULTS and s["on_menu"]]
+    on = [s for s in summ if s["on_menu"]]
     p = sum(s["passed"] for s in faults_only)
     n = sum(s["runs"] for s in faults_only)
     model = rows[0].get("model", "") if rows else ""
     sc = {"model": f"{model} · effort {rows[0].get('effort', '')}" if rows else "", "rows": summ,
           "generated_utc": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(batch_file.stat().st_mtime)),
-          "headline": f"{p} of {n} fault runs named the right cause" if n else "",
+          "headline": f"{sum(s['passed'] for s in on)} of {sum(s['runs'] for s in on)} rehearsal runs passed" if on else "",
+          "detail": f"{p} of {n} single-fault runs named the right cause; the rest are the honesty scenarios of beat 7." if n else "",
           "method": "Each scenario is injected once into the live lab; the agents start 90 s after the first alert and run "
                     "independently. A run passes when its primary cause is in the accepted set (graded by code, not by a model). "
                     "Cost is the API-equivalent price Claude Code reports per run."}

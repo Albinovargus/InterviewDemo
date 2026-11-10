@@ -24,7 +24,7 @@
       "alerts": 0,
       "reasons": [],
       "on_menu": false,
-      "off_reason": "Off the menu: in rehearsal the flag had no measurable effect (product-catalog p95 stayed near 13 ms, no errors, no alert in 7 minutes)."
+      "off_reason": "In rehearsal the flag had no measurable effect (product-catalog p95 stayed near 13 ms, no errors, no alert in 7 minutes)."
     },
     {
       "id": "kafka-lag",
@@ -73,7 +73,7 @@
       "alerts": 0,
       "reasons": [],
       "on_menu": false,
-      "off_reason": "Off the menu: in rehearsal shipping kept its open connection to quote, so lookups never failed (quote's traffic was unchanged, no alert in 7 minutes)."
+      "off_reason": "In rehearsal shipping kept its open connection to quote, so lookups never failed (quote's traffic was unchanged, no alert in 7 minutes)."
     },
     {
       "id": "no-fault",
@@ -137,6 +137,7 @@
     }
   ],
   "generated_utc": "2026-11-10 10:12 UTC",
-  "headline": "25 of 25 fault runs named the right cause",
+  "headline": "45 of 45 rehearsal runs passed",
+  "detail": "25 of 25 single-fault runs named the right cause; the rest are the honesty scenarios of beat 7.",
   "method": "Each scenario is injected once into the live lab; the agents start 90 s after the first alert and run independently. A run passes when its primary cause is in the accepted set (graded by code, not by a model). Cost is the API-equivalent price Claude Code reports per run."
 }

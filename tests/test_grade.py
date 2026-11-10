@@ -68,7 +68,8 @@ def test_scorecard_lists_off_menu_faults_with_their_reason(tmp_path, monkeypatch
     assert ids == ["payment-failure", "db-lock"]
     off = sc["rows"][1]
     assert off["on_menu"] is False and off["off_reason"] == "no effect" and off["runs"] == 0
-    assert sc["headline"] == "1 of 1 fault runs named the right cause"
+    assert sc["headline"] == "1 of 1 rehearsal runs passed"
+    assert sc["detail"].startswith("1 of 1 single-fault runs named the right cause")
 
 
 def test_decoy_passes_when_the_fix_says_to_leave_the_decoy_alone():

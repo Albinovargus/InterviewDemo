@@ -441,7 +441,7 @@ function openStream(url, run, isDiagnosis) {
 
 function apply(run, ev) {
   const d = ev.data || {};
-  if (ev.ts) { run.last = ev.ts; run.start ??= ev.ts; }
+  if (ev.ts && ev.type !== "stream_end") { run.last = ev.ts; run.start ??= ev.ts; }
   switch (ev.type) {
     case "prefetch":
       run.prefetch = d;
@@ -673,7 +673,7 @@ async function renderScorecard(doc) {
   const sc = S.scorecard;
   if (!sc.available) { doc.innerHTML = "<h2>The scorecard</h2><p>No rehearsal results yet.</p>"; return; }
   doc.innerHTML = `<div class="label">Rehearsal · ${esc(sc.model || "")} · ${esc(sc.generated_utc || "")}</div>
-    <h2>${esc(sc.headline || "")}</h2>
+    <h2>${esc(sc.headline || "")}</h2>${sc.detail ? `<p class="hint">${esc(sc.detail)}</p>` : ""}
     <table><thead><tr><th>Scenario</th><th>Passed</th><th>Median time</th><th>Median cost</th><th>Status</th></tr></thead><tbody>
     ${(sc.rows || []).map((x) => {
       const off = x.on_menu === false;
