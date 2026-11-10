@@ -1,0 +1,9 @@
+image: grafana/otel-lgtm:0.39.0
+storage: 10Gi
+grafanaAdminPassword: blast-radius-admin
+nodePorts:
+  grafana: 30300
+  prometheus: 30090
+  loki: 30100
+  tempo: 30200
+  otlpHttp: 30318

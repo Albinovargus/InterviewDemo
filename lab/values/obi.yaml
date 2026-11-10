@@ -1,0 +1,32 @@
+# OBI network preset: records pod-to-pod connections with Kubernetes owners,
+# whether or not the workload is instrumented. Exports OTLP to otel-lgtm.
+preset: network
+config:
+  data:
+    file_format: "1.0"
+    log_level: info
+    extensions:
+      obi:
+        version: "2.0"
+        capture:
+          network:
+            capture:
+              enabled: true
+              filters:
+                metrics:
+                  k8s_src_owner_name:
+                    not_match: '{kube*,*prometheus*,*grafana-agent*}'
+                  k8s_dst_owner_name:
+                    not_match: '{kube*,*prometheus*,*grafana-agent*}'
+        enrich:
+          enrichers:
+            kubernetes:
+              mode: enabled
+    meter_provider:
+      readers:
+        - periodic:
+            interval: 15000
+            exporter:
+              otlp_http:
+                encoding: protobuf
+                endpoint: http://lgtm.observability.svc.cluster.local:4318

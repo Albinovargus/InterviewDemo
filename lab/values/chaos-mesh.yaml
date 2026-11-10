@@ -1,0 +1,8 @@
+# kind runs containerd, not Docker; the chart defaults to Docker.
+chaosDaemon:
+  runtime: containerd
+  socketPath: /run/containerd/containerd.sock
+dashboard:
+  create: false
+dnsServer:
+  create: true

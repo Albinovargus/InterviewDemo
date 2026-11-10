@@ -1,0 +1,38 @@
+# OpenTelemetry Demo 0.42.6 (app 3.1.0). Bundled backends are off; the demo's
+# collector forwards everything to otel-lgtm, which stands in for the existing stack.
+jaeger: {enabled: false}
+prometheus: {enabled: false}
+grafana: {enabled: false}
+opensearch: {enabled: false}
+
+components:
+  # LLM-backed extras: not part of the shop, and they would need an LLM key.
+  agent: {enabled: false}
+  chatbot: {enabled: false}
+  mcp: {enabled: false}
+  telemetry-docs: {enabled: false}
+  frontend-proxy:
+    service:
+      type: NodePort
+      nodePort: 30080
+
+opentelemetry-collector:
+  command:
+    extraArgs: []
+  config:
+    exporters:
+      otlp_http/lgtm:
+        endpoint: http://lgtm.observability.svc.cluster.local:4318
+        tls: {insecure: true}
+        sending_queue:
+          batch: {}
+    service:
+      pipelines:
+        traces:
+          exporters: [otlp_http/lgtm]
+        metrics:
+          receivers: [otlp, kafkametrics, prometheus/ad]
+          exporters: [otlp_http/lgtm]
+        logs:
+          exporters: [otlp_http/lgtm]
+        profiles: null

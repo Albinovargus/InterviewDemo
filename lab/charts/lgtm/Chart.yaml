@@ -1,0 +1,6 @@
+apiVersion: v2
+name: lgtm
+description: grafana/otel-lgtm (Collector, Prometheus, Loki, Tempo, Grafana in one container) for the lab
+type: application
+version: 0.1.0
+appVersion: "0.39.0"
