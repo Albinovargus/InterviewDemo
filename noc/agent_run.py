@@ -68,12 +68,22 @@ class RunHandle:
         return self.done.wait(timeout)
 
     def stop(self) -> None:
-        if self.proc.poll() is None:
-            self.proc.kill()
+        kill_tree(self.proc)
+
+
+def kill_tree(proc: subprocess.Popen) -> None:
+    """Kill the agent and its MCP server children (on Windows, kill() alone orphans them)."""
+    if proc.poll() is not None:
+        return
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True, timeout=15)
+    if proc.poll() is None:
+        proc.kill()
 
 
 def run_agent(model: str = "claude-opus-5-5", effort: str = "high", max_turns: int = 40,
-              run_id: str | None = None, label: str = "live", prompt_override: str | None = None) -> RunHandle:
+              run_id: str | None = None, label: str = "live", prompt_override: str | None = None,
+              timeout_s: float = 720) -> RunHandle:
     run_id = run_id or time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     RUNS.mkdir(exist_ok=True)
     SANDBOX.mkdir(exist_ok=True)
@@ -94,12 +104,32 @@ def run_agent(model: str = "claude-opus-5-5", effort: str = "high", max_turns: i
     f.write(json.dumps(meta) + "\n")
     f.write(json.dumps({"ts": time.time(), "prefetch": prefetch}) + "\n")
     f.flush()
-    proc = subprocess.Popen(cmd, cwd=SANDBOX, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1,
-                            env={**os.environ, "MSYS_NO_PATHCONV": "1"})
-    proc.stdin.write(prompt)  # type: ignore[union-attr]
-    proc.stdin.close()  # type: ignore[union-attr]
+    try:
+        proc = subprocess.Popen(cmd, cwd=SANDBOX, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1,
+                                env={**os.environ, "MSYS_NO_PATHCONV": "1"})
+        proc.stdin.write(prompt)  # type: ignore[union-attr]
+        proc.stdin.close()  # type: ignore[union-attr]
+    except Exception:
+        f.close()
+        raise
     handle = RunHandle(run_id, path, proc, started)
+    err_tail: list[str] = []
+    killed = threading.Event()
+
+    def drain_stderr() -> None:  # read continuously so a chatty process can never block on a full pipe
+        for line in proc.stderr:  # type: ignore[union-attr]
+            err_tail.append(line)
+            del err_tail[:-40]
+
+    def watchdog() -> None:
+        if proc.poll() is None:
+            killed.set()
+            kill_tree(proc)
+
+    timer = threading.Timer(timeout_s, watchdog)
+    timer.daemon = True
+    timer.start()
 
     def pump() -> None:
         try:
@@ -114,12 +144,18 @@ def run_agent(model: str = "claude-opus-5-5", effort: str = "high", max_turns: i
                 f.write(json.dumps({"ts": time.time(), "raw": raw}) + "\n")
                 f.flush()
             proc.wait()
-            err = proc.stderr.read() if proc.stderr else ""  # type: ignore[union-attr]
-            f.write(json.dumps({"ts": time.time(), "exit": {"code": proc.returncode, "stderr": err[-800:]}}) + "\n")
+            timer.cancel()
+            err_thread.join(5)
+            err = "".join(err_tail)[-800:]
+            if killed.is_set():
+                err = f"watchdog: stopped after {timeout_s:.0f} s. " + err
+            f.write(json.dumps({"ts": time.time(), "exit": {"code": proc.returncode, "stderr": err}}) + "\n")
         finally:
             f.close()
             handle.done.set()
 
+    err_thread = threading.Thread(target=drain_stderr, daemon=True)
+    err_thread.start()
     threading.Thread(target=pump, daemon=True).start()
     return handle
 
