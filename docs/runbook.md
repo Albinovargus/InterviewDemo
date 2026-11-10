@@ -1,0 +1,81 @@
+# Blast Radius: demo-day runbook
+
+Everything runs on this laptop. The console is http://127.0.0.1:8765, Grafana is http://localhost:3000.
+
+## Do not
+
+- **Do not restart Docker Desktop, WSL or the PC before the interview.** etcd keeps the cluster's state in the kind node's memory (tmpfs) because the laptop disk was too slow for it. A restarted node comes back empty, and a rebuild takes about 40 minutes (see Rebuild).
+- **Do not let Windows Update restart the PC tonight.** Settings → Windows Update → Pause updates.
+- Keep the laptop plugged in. Sleep is disabled on mains and battery.
+- Do not rebuild the lab after the final rehearsal. Feature freeze is 11:00 PST.
+
+## Timeline on the day (PST)
+
+| Time | Step |
+| --- | --- |
+| 11:00 | Feature freeze. No code or lab changes after this. |
+| 13:00 | `.\scripts\lab.ps1 up`, then `.\scripts\lab.ps1 doctor -Live`. Everything PASS (a WARN for alerts right after a reset is fine). |
+| 13:15 | In the console: click through beats 1–9 once in Replay mode. Play one replay end to end. |
+| 13:30 | Screens open: console on beat 1, Grafana in a second tab. Live mode. Close everything else. |
+
+## Bring-up
+
+```powershell
+cd C:\Users\littl\DemoInterview
+.\scripts\lab.ps1 up          # checks Docker + cluster, starts the console, runs the doctor, opens both screens
+.\scripts\lab.ps1 doctor -Live  # same checks plus a tiny Claude call to prove login and network
+.\scripts\lab.ps1 reset       # clears every fault
+```
+
+If the console window was closed: `uv run python -m noc.console`.
+
+## The console
+
+- **Live / Replay** (top left). Live shows the lab as it is now. Replay plays a recorded real run, labelled with its date and speed in the amber badge, and its map and alerts are the ones recorded at that moment.
+- **Beats 1–9** (left rail, or keys 1–9).
+- **Reset lab** (bottom left) clears every fault in Live mode. Allow 2–3 minutes before the next live fault.
+- The map: click an edge for its evidence, click a service for its callers and dependencies.
+- The verdict card: **Evidence** opens every claim with the tool and query behind it.
+
+## Beat by beat
+
+| # | Say first (what it proves) | Do | If it goes wrong |
+| --- | --- | --- | --- |
+| 1 | "This is a real Kubernetes estate with full telemetry and faults I can switch on." | Beat 1, then **Open Grafana** for live traffic by service. | Stay on the diagram. |
+| 2 | "Code builds the map, not AI. It grades every edge by its evidence." | Beat 2: the map assembles. Click an edge. | **Replay assembly**. |
+| 3 | "A pod with no owner label and no traces is talking to the database. The map says so instead of hiding it." | Beat 3. | It is in the baseline map either way. |
+| 4 | "Pick a fault. The agent is never told which one." | Beat 4, the interviewer picks. Alerts arrive in 1–3 minutes. | Switch to Replay and use beat 5's recorded run of that fault. |
+| 5 | "Claude investigates with read-only tools. Code shrinks the data, the model decides what to ask next." | Beat 5 → **Investigate** (Live), or pick a replay. | A slow run: narrate the steps. A failed run: **Switch to Replay**. A wrong answer: treat it as beat 7. |
+| 6 | "It proposes a fix. It cannot apply one." | Beat 6. | Shows the read-only design even without a run. |
+| 7 | "Two faults, or none: it hedges, or says all is well." | Beat 7, pick a recorded run. | — |
+| 8 | "The same evidence becomes a draft postmortem for people to edit." | Beat 8. | Reads the latest run; in Replay it loads the payment run. |
+| 9 | "Measured, not claimed." | Beat 9: the rehearsal scorecard. | — |
+
+## Honest caveats to say out loud if asked
+
+- **The data counter is small in the lab.** The lab is 18 services at about 25 requests a second, so the counter shows thousands of rows, not millions. What scales is the other side: every tool answer is capped at about 3,500 tokens however much it reads.
+- **Log patterns are computed by our reduction layer**, by templating Loki log lines in code (tested), not by Loki's pattern ingester, which returned nothing for low-volume services.
+- **Replays are real recorded runs**, replayed at the speed shown in the badge (gaps longer than 20 s are shortened).
+- **Cost is the API-equivalent price** that Claude Code reports for the run. The demo itself runs on a Claude subscription.
+
+## Recovering
+
+| Symptom | Fix |
+| --- | --- |
+| Doctor: kafka consumers idle | `kubectl -n otel-demo rollout restart deploy/checkout` (after a Kafka restart checkout's producer does not reconnect). |
+| Doctor: alerts firing with no fault | Wait 3 minutes after a reset (alerts hold for 3 minutes so they do not flap). |
+| Doctor: residue | `.\scripts\lab.ps1 reset` |
+| Console shows "console offline" | Restart it: `uv run python -m noc.console`. |
+| Live investigation fails or hits the usage limit | Replay mode. Every beat has a recorded run. |
+
+## Rebuild (only if the cluster is lost)
+
+About 40 minutes. From Git Bash in the repo, with `source scripts/env.sh`:
+
+1. `cd infra/1-cluster && terraform apply` (kind cluster, etcd on tmpfs)
+2. `cd infra/2-platform && terraform apply` (LGTM, OpenTelemetry Demo, Chaos Mesh, OBI)
+3. `cd infra/3-config && terraform apply` (unknown pod, probe pod, alert rules, viewer token)
+4. `uv run python -m noc.faults init` (change-record repo and the zero-replica canary)
+5. Wait 15 minutes of clean traffic, then save the baseline map:
+   `uv run python -c "from noc.livemap import build_map; open('baselines/map-latest.json','w').write(build_map(600).to_json())"`
+6. `.\scripts\lab.ps1 doctor -Live`
