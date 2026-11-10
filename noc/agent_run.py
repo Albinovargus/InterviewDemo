@@ -98,7 +98,7 @@ def run_agent(model: str = "claude-opus-5-5", effort: str = "high", max_turns: i
            "--mcp-config", str(mcp_config()), "--strict-mcp-config", "--tools", "",
            "--allowedTools", "mcp__reduction", "mcp__grafana",
            "--disallowedTools", *DISALLOWED, "--no-session-persistence"]
-    f = path.open("w", encoding="utf-8")
+    f = path.open("w", encoding="utf-8", newline=chr(10))  # LF on Windows too: the console tails by byte offset
     meta = {"ts": started, "meta": {"id": run_id, "model": model, "effort": effort, "max_turns": max_turns,
                                     "label": label, "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))}}
     f.write(json.dumps(meta) + "\n")

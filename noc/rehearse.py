@@ -228,7 +228,7 @@ def promote_best(batch_file: Path) -> list[str]:
         first["meta"].update(title=sc["title"], scenario=s["id"], beat=sc["beat"], label="recorded real run")
         lines[0] = json.dumps(first)
         dest = REPLAYS / f"{s['id']}.jsonl"
-        dest.write_text(chr(10).join(lines) + chr(10), encoding="utf-8")
+        dest.write_text(chr(10).join(lines) + chr(10), encoding="utf-8", newline=chr(10))
         out.append(f"{s['id']}: {best['run']} ({best['duration_s']}s, {best['reason']}) -> {dest.name}")
     return out
 

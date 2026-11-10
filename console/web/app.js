@@ -31,6 +31,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const fmt = (n) => (n ?? 0).toLocaleString("en-US");
 const clock = (ts) => ts ? new Date(ts * 1000).toISOString().slice(11, 19) + " UTC" : "–";
 const mmss = (s) => s == null ? "–" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const arr = (x) => (Array.isArray(x) ? x : x == null ? [] : [x]);
 const pct = (x) => x == null ? "–" : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`;
 
 async function api(path, opts = {}) {
@@ -115,7 +116,11 @@ function setBeat(n) {
 }
 
 function renderStageTools() {
-  const t = $("stage-tools"); t.innerHTML = "";
+  const running = !!(S.run && !S.run.finished);
+  const key = JSON.stringify([S.beat, S.mode, running, S.run?.kind, S.starting, S.replays.length, S.speed]);
+  const t = $("stage-tools");
+  if (t.dataset.key === key) return;
+  t.dataset.key = key; t.innerHTML = "";
   const add = (label, cls, fn, disabled = false, title = "") => {
     const el = document.createElement("button");
     el.className = "btn " + cls; el.textContent = label; el.disabled = disabled; if (title) el.title = title;
@@ -127,9 +132,9 @@ function renderStageTools() {
   }
   if (S.beat === 2) add("Replay assembly", "", assemble);
   if (S.beat === 5) {
-    const running = S.run && !S.run.finished;
     if (S.mode === "live") {
-      add(running ? "Investigating…" : "Investigate", "primary", startLive, running && S.run.kind === "live");
+      add(S.starting ? "Starting…" : running && S.run.kind === "live" ? "Investigating…" : "Investigate", "primary", startLive,
+          S.starting || (running && S.run.kind === "live"));
       if (running && S.run.kind === "live") add("Stop", "", stopLive);
     } else {
       const reps = replaysFor(5);
@@ -158,7 +163,8 @@ function setMode(m) {
   S.mode = m;
   $("mode-live").setAttribute("aria-pressed", String(m === "live"));
   $("mode-replay").setAttribute("aria-pressed", String(m === "replay"));
-  if (m === "live") { closeStream(); S.run = null; renderRun(); pollAlerts(); pollMap(true); reattachLive(); }
+  closeStream(); S.run = null; S.diagnosis = null; renderRun(); pollAlerts(); pollMap(true);
+  if (m === "live") reattachLive();
   setBeat(S.beat);
 }
 
@@ -361,10 +367,11 @@ new ResizeObserver(() => {
 function renderAlerts() {
   const a = alertData()?.alerts || [];
   $("stat-alerts").textContent = a.length;
+  $("stat-alerts-word").textContent = a.length === 1 ? "alert" : "alerts";
   $("alert-dot").className = "dot " + (a.length ? "firing" : "ok");
   $("alerts-sub").textContent = S.mode === "replay" && S.run?.prefetch?.alerts ? `as recorded · ${clock(S.run.prefetch.alerts.at)}` : "Grafana alerting · live";
   const box = $("alerts");
-  if (!a.length) { box.innerHTML = `<div class="empty">No alerts firing.</div>`; return; }
+  if (!a.length) { box.innerHTML = `<div class="empty">No alerts firing.</div>`; delete box.dataset.key; return; }
   const key = a.map((x) => x.alert + x.service).join("|");
   if (box.dataset.key === key) return; // unchanged: keep the DOM so nothing re-animates
   box.dataset.key = key;
@@ -405,20 +412,22 @@ async function resetLab() {
 
 // ---------------------------------------------------------------- runs (live + replay share one path)
 
-function newRun(id, kind) {
-  return { id, kind, meta: null, steps: new Map(), order: [], notes: [], counter: null, verdict: null, error: null,
+function newRun(id, kind, speed = null) {
+  return { id, kind, speed, meta: null, steps: new Map(), order: [], notes: [], counter: null, verdict: null, error: null,
            cost: null, start: null, last: null, tools: [], finished: false, prefetch: null, rateLimited: false };
 }
 function closeStream() { if (S.es) { S.es.close(); S.es = null; } }
 
-function openStream(url, run) {
+function openStream(url, run, isDiagnosis) {
   closeStream();
-  S.run = run; renderRun();
+  S.run = run;
+  if (isDiagnosis) S.diagnosis = run;
+  renderRun();
   const es = new EventSource(url); S.es = es;
   es.onmessage = (msg) => {
     if (S.run !== run) return;
     const ev = JSON.parse(msg.data);
-    if (ev.type === "meta") { const keep = run.kind; Object.assign(run, newRun(run.id, keep)); run.meta = ev.data; run.start = ev.ts; }
+    if (ev.type === "meta") { Object.assign(run, newRun(run.id, run.kind, run.speed)); run.meta = ev.data; run.start = ev.ts; }
     apply(run, ev);
     if (ev.type === "stream_end") { es.close(); if (S.es === es) S.es = null; }
     renderRun();
@@ -454,8 +463,11 @@ function apply(run, ev) {
     case "counter": run.counter = d; break;
     case "verdict": run.verdict = d; break;
     case "cost": run.cost = d; break;
-    case "rate_limit": run.rateLimited = true; run.error = "Claude usage limit reached. Switch to Replay."; break;
-    case "error": run.error = d.message + (d.stderr ? ` (${d.stderr.slice(-160)})` : ""); break;
+    case "rate_limit":
+      run.rateLimited = true;
+      run.error = `Claude usage limit reached (${d.window || "limit"}${d.resets_at ? `, resets ${new Date(d.resets_at * 1000).toLocaleTimeString()}` : ""}). Switch to Replay.`;
+      break;
+    case "error": if (!run.rateLimited) run.error = d.message + (d.stderr ? ` (${d.stderr.slice(-160)})` : ""); break;
     case "run_finished": run.finished = true; run.ok = d.ok; run.duration = d.duration_s; break;
     case "stream_end": run.finished = true; break;
   }
@@ -476,14 +488,17 @@ function renderRun() {
   const r = S.run;
   const steps = $("steps");
   $("replay-badge").hidden = !(r && r.kind === "replay");
-  if (r && r.kind === "replay") $("replay-badge").textContent = `Recorded real run · ${r.meta?.started_utc?.replace("T", " ").replace("Z", " UTC") || ""} · ${S.speed}× speed`;
+  if (r && r.kind === "replay") {
+    const m = r.meta || {};
+    $("replay-badge").textContent = `Recorded real run · ${(m.started_utc || "").replace("T", " ").replace("Z", " UTC")} · ${m.model || ""}${m.effort ? " " + m.effort : ""} · ${r.speed === 0 ? "shown instantly" : `${r.speed}× speed`}`;
+  }
   if (!r) {
     steps.innerHTML = `<li class="empty">${S.mode === "live" ? "No investigation yet. Beat 5 starts one." : "Pick a replay."}</li>`;
     $("verdict").innerHTML = ""; $("steps-sub").textContent = "idle"; $("stat-time").textContent = "–"; $("stat-cost").textContent = "–";
     renderCounter(null); return;
   }
   const elapsed = r.start && r.last ? r.last - r.start : 0;
-  $("stat-time").textContent = mmss(r.duration ?? elapsed);
+  $("stat-time").textContent = mmss(elapsed);
   $("stat-cost").textContent = r.cost?.usd != null ? `$${r.cost.usd.toFixed(2)}` : "–";
   $("steps-sub").textContent = r.finished ? (r.ok ? "finished" : "stopped") : `${r.model || r.meta?.model || ""} · working`;
   const items = r.order.map((id) => {
@@ -502,7 +517,7 @@ function renderRun() {
   renderVerdict(r);
   renderMapState();
   if (S.beat === 5) renderStageTools();
-  if (!$("view-doc").hidden && r.finished) renderDoc();
+  if (!$("view-doc").hidden && r.finished && S.beat !== 9) renderDoc();
 }
 
 function renderCounter(c) {
@@ -524,29 +539,32 @@ function animateNumber(el, to) {
 function renderVerdict(r) {
   const box = $("verdict");
   if (r.error && !r.verdict) {
+    delete box.dataset.key;
     box.innerHTML = `<div class="verdict failed"><div class="k">Run did not finish</div><h3>${esc(r.error)}</h3>
       <p>Every beat has a recorded replay behind it.</p><div class="actions"><button class="btn" onclick="setMode('replay')">Switch to Replay</button></div></div>`;
     return;
   }
   const v = r.verdict;
-  if (!v) { box.innerHTML = ""; return; }
+  if (!v) { box.innerHTML = ""; delete box.dataset.key; return; }
   const status = ["diagnosed", "uncertain", "healthy"].includes(v.status) ? v.status : "uncertain";
   const pc = v.primary_cause || {};
-  const cands = (v.candidates || []).map((c) => c.service).filter(Boolean);
+  const cands = arr(v.candidates).map((c) => c || {}).map((c) => c.service).filter(Boolean);
   const head = status === "healthy" ? "No incident: the estate looks healthy"
     : status === "uncertain" ? (cands.length ? `Not certain: ${cands.join(" or ")}` : pc.service ? `Probably ${pc.service}, not certain` : "Not certain")
     : `${pc.service || "?"}`;
   const body = status === "uncertain"
-    ? (v.candidates || []).map((c) => `<p><b>${esc(c.service)}:</b> ${esc(c.why || "")}</p>`).join("") + (v.deciding_query ? `<p><b>Query that would decide:</b> ${esc(v.deciding_query)}</p>` : "")
+    ? arr(v.candidates).map((c) => c || {}).map((c) => `<p><b>${esc(c.service)}:</b> ${esc(c.why || "")}</p>`).join("") + (v.deciding_query ? `<p><b>Query that would decide:</b> ${esc(v.deciding_query)}</p>` : "")
     : status === "healthy" ? (v.why ? `<p>${esc(v.why)}</p>` : "") : (pc.mechanism ? `<p>${esc(pc.mechanism)}</p>` : "");
-  const key = JSON.stringify([status, head, v.confidence, r.cost?.usd]);
-  if (box.dataset.key === key) return; box.dataset.key = key;
-  box.innerHTML = `<div class="verdict ${status}"><div class="k">${esc(status === "diagnosed" ? "Primary cause" : status)}<span>confidence ${esc(v.confidence || "–")}</span></div>
+  const key = JSON.stringify([r.id, status, head, v.confidence, r.cost?.usd]);
+  if (box.dataset.key !== key) {
+  box.dataset.key = key;
+  box.innerHTML = `<div class="verdict ${status}"><div class="k">${esc(status === "diagnosed" ? "Primary cause" : status)}<span>${v.confidence ? `confidence ${esc(v.confidence)}` : ""}</span></div>
     <h3>${esc(head)}</h3>${body}
-    ${(v.symptoms || []).length ? `<p><b>Symptoms, not causes:</b> ${esc(v.symptoms.join(", "))}</p>` : ""}
-    <div class="actions"><button class="btn" id="v-evidence">Evidence (${(v.evidence || []).length})</button>
+    ${arr(v.symptoms).length ? `<p><b>Symptoms, not causes:</b> ${esc(arr(v.symptoms).join(", "))}</p>` : ""}
+    <div class="actions"><button class="btn" id="v-evidence">Evidence (${arr(v.evidence).length})</button>
     ${v.proposed_fix ? `<button class="btn" onclick="setBeat(6)">Proposed fix</button>` : ""}${v.postmortem ? `<button class="btn" onclick="setBeat(8)">Postmortem</button>` : ""}</div></div>`;
-  $("v-evidence").onclick = () => showEvidence(r);
+  }
+  const btn = $("v-evidence"); if (btn) btn.onclick = () => showEvidence(r);
 }
 
 function showEvidence(r) {
@@ -556,7 +574,7 @@ function showEvidence(r) {
   modal(`<h2>Evidence behind the answer</h2>
     ${answer ? `<p style="color:var(--text-2);line-height:1.5">${esc(answer)}</p>` : ""}
     <div class="doc" style="padding:0">
-    ${(v.evidence || []).map((e, i) => `<p><b>${i + 1}. ${esc(e.claim)}</b><br><span class="kv">${esc(e.tool)}${e.query ? ` · ${esc(e.query)}` : ""}</span></p>`).join("") || "<p>No evidence listed.</p>"}
+    ${arr(v.evidence).map((e) => e || {}).map((e, i) => `<p><b>${i + 1}. ${esc(e.claim)}</b><br><span class="kv">${esc(e.tool)}${e.query ? ` · ${esc(e.query)}` : ""}</span></p>`).join("") || "<p>No evidence listed.</p>"}
     ${Object.keys(ck).length ? `<h2>Checklist</h2>${Object.entries(ck).map(([k, x]) => `<p><b>${esc(k)}:</b> ${esc(typeof x === "string" ? x : JSON.stringify(x))}</p>`).join("")}` : ""}
     </div>`);
 }
@@ -569,14 +587,17 @@ $("modal").addEventListener("click", (e) => { if (e.target.id === "modal") close
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeModal();
   if (e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (/^[1-9]$/.test(e.key)) setBeat(+e.key);
+  if (/^[1-9]$/.test(e.key) && $("modal").hidden) setBeat(+e.key);
 });
 
 async function startLive() {
+  if (S.starting) return;
+  S.starting = true; renderStageTools();
   try {
     const r = await api("/api/runs", { method: "POST", body: JSON.stringify({}) });
-    openStream(`/api/runs/${r.id}/events`, newRun(r.id, "live"));
+    openStream(`/api/runs/${r.id}/events`, newRun(r.id, "live"), true);
   } catch (e) { toast(e.message, true); }
+  finally { S.starting = false; renderStageTools(); }
 }
 async function stopLive() {
   if (!S.run) return;
@@ -586,29 +607,30 @@ async function reattachLive() {
   // After a page reload, pick a still-running live investigation back up (never an old finished one).
   try {
     const a = await api("/api/runs/active");
-    if (a.id && !S.run && S.mode === "live") openStream(`/api/runs/${a.id}/events`, newRun(a.id, "live"));
+    if (a.id && !S.run && S.mode === "live") openStream(`/api/runs/${a.id}/events`, newRun(a.id, "live"), true);
   } catch { /* console offline: health shows it */ }
 }
 
 function replaysFor(beat) { return S.replays.filter((r) => r.beat === beat); }
 function playReplay(id, speed = S.speed) {
   if (S.mode !== "replay") { S.mode = "replay"; $("mode-live").setAttribute("aria-pressed", "false"); $("mode-replay").setAttribute("aria-pressed", "true"); }
-  openStream(`/api/replays/${encodeURIComponent(id)}/events?speed=${speed}`, newRun(id, "replay"));
+  const rep = S.replays.find((x) => x.id === id);
+  openStream(`/api/replays/${encodeURIComponent(id)}/events?speed=${speed}`, newRun(id, "replay", speed), rep?.beat === 5);
 }
 function ensureRunForBeat() {
-  if (S.run) return;
+  if (S.diagnosis || (S.run && !S.run.finished)) return;
   if (S.mode === "replay" && (S.beat === 6 || S.beat === 8)) { const r = replaysFor(5)[0]; if (r) playReplay(r.id, 0); }
 }
 
 // ---------------------------------------------------------------- documents (beats 6-9)
 
 function renderDoc() {
-  const doc = $("doc"), r = S.run, v = r?.verdict;
+  const doc = $("doc"), r = S.diagnosis, v = r?.verdict;
   const needRun = `<p>This beat reads the latest investigation. ${S.mode === "live" ? "Run one in beat 5, or switch to Replay." : "Pick a replay in beat 5."}</p>`;
   if (S.beat === 6) {
     if (!v) { doc.innerHTML = `<h2>The guardrail</h2>` + needRun + guardrailDesign(r); return; }
     const f = v.proposed_fix;
-    doc.innerHTML = `<div class="label">Proposed fix · waiting for a person</div>
+    doc.innerHTML = `${f ? `<div class="label">Proposed fix · waiting for a person</div>` : ""}
       ${f ? `<h2>${esc(f.action)}</h2><p><b>Risk:</b> ${esc(f.risk || "–")}</p><p><b>How to verify:</b> ${esc(f.verify || "–")}</p>` : `<h2>No fix proposed</h2><p>The agent did not propose a change for this run.</p>`}
       <div class="toolbar" style="margin:14px 0"><button class="btn primary" disabled title="The agent has no write access">Approve and apply</button>
       <span class="status-line">The agent cannot apply this. It has no tool that writes. A person runs it through normal change control.</span></div>` + guardrailDesign(r);
@@ -618,7 +640,8 @@ function renderDoc() {
   if (S.beat === 8) {
     const p = v?.postmortem;
     if (!p) { doc.innerHTML = `<h2>The postmortem</h2>` + (v ? "<p>This run did not include a postmortem draft.</p>" : needRun); return; }
-    const list = (x) => Array.isArray(x) ? `<ul>${x.map((i) => `<li>${esc(typeof i === "string" ? i : Object.values(i).join(" — "))}</li>`).join("")}</ul>` : `<p>${esc(x || "–")}</p>`;
+    const item = (i) => (i && typeof i === "object" ? Object.values(i).join(" — ") : String(i ?? ""));
+    const list = (x) => Array.isArray(x) ? `<ul>${x.map((i) => `<li>${esc(item(i))}</li>`).join("")}</ul>` : `<p>${esc(item(x) || "–")}</p>`;
     doc.innerHTML = `<div class="label">Draft · written by Claude for people to edit · ${esc(r.kind === "replay" ? "recorded run" : "live run")}</div>
       <h2>Summary</h2><p>${esc(p.summary || "–")}</p><h2>Timeline</h2>${list(p.timeline)}<h2>Root cause</h2>${list(p.root_cause)}
       <h2>Blast radius</h2>${list(p.blast_radius)}<h2>Action items</h2>${list(p.action_items)}<h2>Gaps in the map</h2>${list(p.map_gaps)}`;

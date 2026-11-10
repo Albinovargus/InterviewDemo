@@ -18,7 +18,7 @@
     <span class="badge" id="replay-badge" hidden></span>
     <div class="spacer"></div>
     <div class="stats">
-      <span><span class="dot" id="alert-dot"></span><b id="stat-alerts">0</b> alerts firing</span>
+      <span><span class="dot" id="alert-dot"></span><b id="stat-alerts">0</b> <span id="stat-alerts-word">alerts</span> firing</span>
       <span><span class="dot" id="backend-dot"></span><b id="stat-backends">…</b></span>
       <span>run <b id="stat-time">–</b></span>
       <span title="What this run would cost at API prices">API-equivalent cost <b id="stat-cost">–</b></span>
@@ -56,12 +56,12 @@
         </div>
         <div id="map-callout"></div>
         <div class="card counter" id="counter" hidden>
-          <div class="counter-head"><b>What the model actually read</b><span>Code and queries reduce telemetry before Claude sees it</span></div>
+          <div class="counter-head"><b>What the model actually read</b><span>spans, log lines, data points and events, reduced by code before Claude sees them</span></div>
           <div class="funnel">
-            <div><div class="v" id="c-scanned">0</div><div class="l">rows scanned by code</div><div class="bar"><div id="b-scanned" style="background:var(--grey)"></div></div></div>
+            <div><div class="v" id="c-scanned">0</div><div class="l">records summarised by code</div><div class="bar"><div id="b-scanned" style="background:var(--grey)"></div></div></div>
             <div><div class="v" id="c-found">0</div><div class="l">patterns and signals</div><div class="bar"><div id="b-found" style="background:var(--blue)"></div></div></div>
             <div><div class="v" id="c-anomalous">0</div><div class="l">anomalous</div><div class="bar"><div id="b-anomalous" style="background:var(--coral)"></div></div></div>
-            <div><div class="v" id="c-tokens">0</div><div class="l">tokens sent to Claude</div><div class="bar"><div id="b-tokens" style="background:var(--amber)"></div></div></div>
+            <div><div class="v" id="c-tokens">0</div><div class="l">tokens of tool output to Claude (est.)</div><div class="bar"><div id="b-tokens" style="background:var(--amber)"></div></div></div>
           </div>
         </div>
       </section>

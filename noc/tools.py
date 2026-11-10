@@ -92,6 +92,14 @@ def load_baseline() -> ServiceMap | None:
     return ServiceMap.from_json(BASELINE.read_text()) if BASELINE.exists() else None
 
 
+def _spans_in_window(window_minutes: int) -> int:
+    try:
+        r = clients.prom_query(f"sum(increase(traces_spanmetrics_calls_total[{window_minutes}m]))")
+        return int(float(r[0]["value"][1])) if r else 0
+    except clients.QueryError:
+        return 0
+
+
 def service_map(compare_to_baseline: bool = True, window_minutes: int = 5) -> dict:
     now = livemap.build_map(window_minutes * 60)
     base = load_baseline() if compare_to_baseline else None
@@ -117,8 +125,8 @@ def service_map(compare_to_baseline: bool = True, window_minutes: int = 5) -> di
            "how_to_read": "'A calls B' means A depends on B. Errors in B surface as errors in A.",
            "uninstrumented": sorted(n for n, v in now.nodes.items() if not v.get("instrumented")),
            "unlabelled": sorted(n for n, v in now.nodes.items() if not v.get("labelled") and v.get("kind") != "virtual"),
-           # requests summarised = traced calls behind the edges in this window
-           "counts": {"scanned_requests": int(sum(e.rate for e in now.edges) * window_minutes * 60),
+           # records summarised = every span the window's span metrics were built from
+           "counts": {"scanned_requests": _spans_in_window(window_minutes),
                       "edges": len(now.edges), "changed_edges": changed}}
     if not base:
         out["baseline"] = "missing: no healthy baseline saved, so silent edges cannot be detected"

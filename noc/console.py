@@ -27,6 +27,8 @@ WEB = clients.ROOT / "console" / "web"
 REPLAYS = clients.ROOT / "replays"
 SCORECARD = REPLAYS / "scorecard.json"  # committed with the replays it summarises
 DEMO_MODEL, DEMO_EFFORT = "claude-opus-5-5", "high"
+IDLE_LIMIT_S = 300  # a live run silent this long is stopped (the runner also caps every run at 12 minutes)
+FAULT_MENU = clients.ROOT / "lab" / "fault-menu.json"  # {"off": {"<fault id>": "<why it is off the menu>"}}
 
 log = logging.getLogger("console")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -70,7 +72,8 @@ async def alerts(_: Request) -> JSONResponse:
 
 
 async def fault_list(_: Request) -> JSONResponse:
-    return JSONResponse({"faults": [{"id": f.id, "title": f.title} for f in faults.FAULTS.values()],
+    off = json.loads(FAULT_MENU.read_text()).get("off", {}) if FAULT_MENU.exists() else {}
+    return JSONResponse({"faults": [{"id": f.id, "title": f.title, "excluded": off.get(f.id)} for f in faults.FAULTS.values()],
                          "job": _fault_job})
 
 
@@ -172,29 +175,38 @@ async def _stream(path: Path, live: RunHandle | None, speed: float):
     prev_ts = None
     idle_since = time.time()
     while True:
-        lines = []
+        lines: list[str] = []
         if path.exists():
-            with path.open(encoding="utf-8") as f:
+            # Binary + byte offsets: exact for any line ending; a half-written last line waits for its newline.
+            with path.open("rb") as f:
                 f.seek(pos)
                 chunk = f.read()
-                if chunk:
-                    complete, _, rest = chunk.rpartition("\n")
-                    if complete:
-                        lines = complete.split("\n")
-                        pos += len((complete + "\n").encode("utf-8"))
+            complete, sep, _ = chunk.rpartition(b"\n")
+            if sep:
+                pos += len(complete) + 1
+                lines = [ln.decode("utf-8", "replace") for ln in complete.split(b"\n")]
         if not lines:
             if live is None or (live.done.is_set() and pos >= path.stat().st_size):
                 break
-            if time.time() - idle_since > 600:
-                yield _sse({"type": "error", "ts": time.time(), "data": {"message": "No events for 10 minutes."}})
-                break
+            if time.time() - idle_since > IDLE_LIMIT_S:
+                if live.proc is not None:
+                    live.stop()
+                ts = time.time()
+                msg = f"The agent sent nothing for {IDLE_LIMIT_S // 60} minutes, so it was stopped."
+                yield _sse({"type": "error", "ts": ts, "data": {"message": msg}})
+                yield _sse({"type": "run_finished", "ts": ts, "data": {"ok": False, "duration_s": None}})
+                yield _sse({"type": "stream_end", "ts": ts, "data": {}})
+                return
             await asyncio.sleep(0.25)
             continue
         idle_since = time.time()
         for line in lines:
             if not line.strip():
                 continue
-            rec = json.loads(line)
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
             ts = rec.get("ts", time.time())
             if live is None and prev_ts is not None and speed > 0:
                 await asyncio.sleep(min(max(ts - prev_ts, 0) / speed, 20))
