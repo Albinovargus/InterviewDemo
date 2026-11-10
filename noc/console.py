@@ -73,8 +73,12 @@ async def alerts(_: Request) -> JSONResponse:
         return _err(str(e), 503)
 
 
+def _off_menu() -> dict:
+    return json.loads(FAULT_MENU.read_text(encoding="utf-8")).get("off", {}) if FAULT_MENU.exists() else {}
+
+
 async def fault_list(_: Request) -> JSONResponse:
-    off = json.loads(FAULT_MENU.read_text()).get("off", {}) if FAULT_MENU.exists() else {}
+    off = _off_menu()
     return JSONResponse({"faults": [{"id": f.id, "title": f.title, "excluded": off.get(f.id)} for f in faults.FAULTS.values()],
                          "job": _fault_job})
 
@@ -97,6 +101,8 @@ async def fault_action(request: Request) -> JSONResponse:
     action = "reset" if request.url.path.endswith("/reset") else "inject"
     if action == "inject" and fid not in faults.FAULTS:
         return _err(f"unknown fault {fid}", 404)
+    if action == "inject" and fid in _off_menu():
+        return _err(f"{fid} is off the menu: {_off_menu()[fid]}", 409)
     if _fault_job.get("state") == "running":
         return _err("another fault action is still running", 409)
     _fault_job.clear()
@@ -165,7 +171,7 @@ async def active_run(_: Request) -> JSONResponse:
 async def stop_run(request: Request) -> JSONResponse:
     h = _live.get(request.path_params["id"])
     if h:
-        h.stop()
+        await asyncio.to_thread(h.stop)  # taskkill can take seconds; keep the event loop serving
     return JSONResponse({"stopped": bool(h)})
 
 
@@ -194,7 +200,7 @@ async def _stream(path: Path, live: RunHandle | None, speed: float):
                 break
             if time.time() - idle_since > IDLE_LIMIT_S:
                 if live.proc is not None:
-                    live.stop()
+                    await asyncio.to_thread(live.stop)
                 ts = time.time()
                 msg = f"The agent sent nothing for {IDLE_LIMIT_S // 60} minutes, so it was stopped."
                 yield _sse({"type": "error", "ts": ts, "data": {"message": msg}})
@@ -242,7 +248,7 @@ def _sse_response(gen) -> StreamingResponse:
 async def run_events(request: Request) -> StreamingResponse | JSONResponse:
     rid = request.path_params["id"]
     path = RUNS / f"{rid}.jsonl"
-    if not path.exists():
+    if not path.exists() or path.resolve().parent != RUNS.resolve():
         return _err("no such run", 404)
     return _sse_response(_stream(path, _live.get(rid) or RunHandle(rid, path, None, 0, _done()), 0))  # type: ignore[arg-type]
 

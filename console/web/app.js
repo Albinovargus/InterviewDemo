@@ -8,7 +8,7 @@ const BEATS = [
   { n: 4, title: "Break something", lede: "Pick a fault. Alerts flood in from the symptoms, not only from the cause.", view: "map" },
   { n: 5, title: "The diagnosis", lede: "Claude investigates with read-only tools. Code shrinks the data; the model decides what to ask next.", view: "map" },
   { n: 6, title: "The guardrail", lede: "The agent proposes a fix. It cannot apply one: a person approves it through normal change control.", view: "doc" },
-  { n: 7, title: "The honest answer", lede: "Two faults at once, or none at all. A trustworthy agent hedges, or says the estate is healthy.", view: "doc" },
+  { n: 7, title: "The honest answer", lede: "Two faults at once, none at all, a planted instruction, a misleading change. A trustworthy agent names both, says all is well, or says why it is not fooled.", view: "doc" },
   { n: 8, title: "The postmortem", lede: "The same evidence, drafted into a timeline, root cause and action items for people to edit.", view: "doc" },
   { n: 9, title: "The scorecard", lede: "Measured, not claimed: rehearsal runs per fault, with pass rate, median time and cost.", view: "doc" },
 ];
@@ -165,8 +165,13 @@ function setMode(m) {
   S.mode = m;
   $("mode-live").setAttribute("aria-pressed", String(m === "live"));
   $("mode-replay").setAttribute("aria-pressed", String(m === "replay"));
-  closeStream(); S.run = null; S.diagnosis = null; renderRun(); pollAlerts(); pollMap(true);
-  if (m === "live") reattachLive();
+  closeStream(); S.run = null; S.diagnosis = null;
+  if (m === "live" && S.liveDiagnosis) {
+    if (S.liveDiagnosis.finished) { S.run = S.liveDiagnosis; S.diagnosis = S.liveDiagnosis; }
+    else S.liveDiagnosis = null; // still running: reattach below replays it from the start
+  }
+  renderRun(); pollAlerts(); pollMap(true);
+  if (m === "live" && !S.run) reattachLive();
   setBeat(S.beat);
 }
 
@@ -388,8 +393,11 @@ function renderFaultBar() {
   if (bar.hidden) return;
   const busy = S.job?.state === "running";
   const replay = S.mode === "replay";
+  const key = JSON.stringify([busy, replay, S.faults, S.job?.state, S.job?.action, S.job?.fault, S.job?.at]);
+  if (bar.dataset.key === key) return;
+  bar.dataset.key = key;
   bar.innerHTML = `<div class="faults" style="flex:1 1 100%">${S.faults.map((f) =>
-    `<button class="fault ${f.excluded ? "excluded" : ""}" data-id="${esc(f.id)}" ${busy || replay || f.excluded ? "disabled" : ""} title="${f.excluded ? esc(f.excluded) : ""}">${esc(f.title)}<small>${esc(f.id)}</small></button>`).join("")}</div>
+    `<button class="fault ${f.excluded ? "excluded" : ""}" data-id="${esc(f.id)}" ${busy || replay || f.excluded ? "disabled" : ""} title="${f.excluded ? esc(f.excluded) : ""}">${esc(f.title)}<small>${f.excluded ? "off the menu · failed rehearsal" : esc(f.id)}</small></button>`).join("")}</div>
     <span class="status-line ${S.job?.state === "error" ? "err" : ""}">${esc(jobLine())}</span>`;
   bar.querySelectorAll(".fault").forEach((el) => (el.onclick = () => inject(el.dataset.id)));
 }
@@ -401,7 +409,7 @@ function jobLine() {
   if (j.state === "done" && j.action === "inject") return `${j.fault} injected at ${clock(j.at)}. Alerts usually fire within 1–3 minutes.`;
   if (j.state === "done" && j.action === "reset") return `Lab reset at ${clock(j.at)}.`;
   const off = S.faults.filter((f) => f.excluded).length;
-  return `Pick a fault. The agent is never told which one.${off ? ` Greyed out: ${off} that failed rehearsal (hover for why).` : ""}`;
+  return `Pick a fault. The agent is never told which one.${off ? ` Greyed out: ${off} that failed rehearsal (the scorecard says why).` : ""}`;
 }
 async function inject(id) {
   try { S.job = await api(`/api/faults/${encodeURIComponent(id)}`, { method: "POST" }); renderFaultBar(); }
@@ -425,6 +433,7 @@ function openStream(url, run, isDiagnosis) {
   closeStream();
   S.run = run;
   if (isDiagnosis) S.diagnosis = run;
+  if (run.kind === "live") S.liveDiagnosis = run;
   renderRun();
   const es = new EventSource(url); S.es = es;
   es.onmessage = (msg) => {
@@ -497,6 +506,7 @@ function renderRun() {
   }
   if (!r) {
     steps.innerHTML = `<li class="empty">${S.mode === "live" ? "No investigation yet. Beat 5 starts one." : "Pick a replay."}</li>`;
+    delete steps.dataset.key; delete $("verdict").dataset.key; // emptied: the next run must redraw even if it is the same one
     $("verdict").innerHTML = ""; $("steps-sub").textContent = "idle"; $("stat-time").textContent = "–"; $("stat-cost").textContent = "–";
     renderCounter(null); return;
   }
@@ -564,10 +574,14 @@ function renderVerdict(r) {
   box.innerHTML = `<div class="verdict ${status}"><div class="k">${esc(status === "diagnosed" ? "Primary cause" : status)}<span>${v.confidence ? `confidence ${esc(v.confidence)}` : ""}</span></div>
     <h3>${esc(head)}</h3>${body}
     ${arr(v.symptoms).length ? `<p><b>Symptoms, not causes:</b> ${esc(arr(v.symptoms).join(", "))}</p>` : ""}
+    ${arr(v.other_issues).filter((o) => o && o.service).map((o) => `<p><b>Also found, separate issue:</b> ${esc(o.service)}${o.why ? ` · ${esc(o.why)}` : ""}</p>`).join("")}
     <div class="actions"><button class="btn" id="v-evidence">Evidence (${arr(v.evidence).length})</button>
-    ${v.proposed_fix ? `<button class="btn" onclick="setBeat(6)">Proposed fix</button>` : ""}${v.postmortem ? `<button class="btn" onclick="setBeat(8)">Postmortem</button>` : ""}</div></div>`;
+    ${v.proposed_fix ? `<button class="btn" id="v-fix">Proposed fix</button>` : ""}${v.postmortem ? `<button class="btn" id="v-pm">Postmortem</button>` : ""}</div></div>`;
   }
   const btn = $("v-evidence"); if (btn) btn.onclick = () => showEvidence(r);
+  const open = (beat) => () => { S.diagnosis = r; setBeat(beat); };
+  if ($("v-fix")) $("v-fix").onclick = open(6);
+  if ($("v-pm")) $("v-pm").onclick = open(8);
 }
 
 function showEvidence(r) {
@@ -616,7 +630,7 @@ async function reattachLive() {
 
 function replaysFor(beat) { return S.replays.filter((r) => r.beat === beat); }
 function playReplay(id, speed = S.speed) {
-  if (S.mode !== "replay") { S.mode = "replay"; $("mode-live").setAttribute("aria-pressed", "false"); $("mode-replay").setAttribute("aria-pressed", "true"); }
+  if (S.mode !== "replay") { setMode("replay"); toast("Switched to Replay to play a recorded run."); }
   const rep = S.replays.find((x) => x.id === id);
   openStream(`/api/replays/${encodeURIComponent(id)}/events?speed=${speed}`, newRun(id, "replay", speed), rep?.beat === 5);
 }

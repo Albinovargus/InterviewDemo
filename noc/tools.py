@@ -224,7 +224,16 @@ def metric_movers(services: list[str] | None = None, window_minutes: int = 15) -
 LINE_CAP = 5000  # lines templated per window; counts above this are sampled, and the result says so
 
 
+def _hidden_service(service: str) -> dict | None:
+    """The fault tooling is out of the agent's view: asking for it gets a plain refusal, not data."""
+    if any(h in (service or "") for h in clients.HIDDEN_WORKLOADS):
+        return {"service": service, "error": f"{service} is lab tooling outside the investigated estate; pick a service from the map"}
+    return None
+
+
 def log_pattern_diff(service: str, window_minutes: int = 15) -> dict:
+    if (hidden := _hidden_service(service)):
+        return hidden
     (b0, b1), (i0, i1) = _windows(window_minutes)
     sel = f'{{service_name="{service}"}}'
     n_base, n_inc = int(clients.loki_count(sel, b0, b1)), int(clients.loki_count(sel, i0, i1))
@@ -286,12 +295,15 @@ def _span_rows(trace: dict) -> list[dict]:
 
 
 def trace_examples(service: str, only_errors: bool = True, limit: int = 3) -> dict:
+    if (hidden := _hidden_service(service)):
+        return hidden
     (_, _), (i0, i1) = _windows(15)
     q = f'{{resource.service.name="{service}"' + (' && status=error}' if only_errors else '}')
     found = clients.tempo_search(q, i0, i1, limit=min(limit, 3))
     examples = []
     for t in found:
-        rows = _span_rows(clients.tempo_trace(t["traceID"]))
+        rows = [r for r in _span_rows(clients.tempo_trace(t["traceID"]))
+                if not any(h in r["service"] for h in clients.HIDDEN_WORKLOADS)]
         errs = [r for r in rows if r["error"]]
         focus = errs or [r for r in rows if r["service"] == service][:5]
         keep = (rows[:4] + focus[:6]) if len(rows) > 10 else rows

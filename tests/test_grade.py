@@ -32,11 +32,15 @@ def test_no_fault_needs_healthy():
     assert not grade({"kind": "none"}, v(status="diagnosed", service="payment")).passed
 
 
-def test_two_faults_need_both_named_and_not_healthy():
+def test_two_faults_need_both_named_as_causes_and_not_healthy():
     s = {"kind": "two", "accept": [["payment"], ["recommendation"]]}
-    assert grade(s, v(status="uncertain", text="payment fails and recommendation leaks memory")).passed
-    assert not grade(s, v(text="payment fails")).passed
-    assert not grade(s, v(status="healthy", text="payment recommendation")).passed
+    hedge = {"status": "uncertain", "candidates": [{"service": "payment", "why": "x"}, {"service": "recommendation", "why": "y"}]}
+    assert grade(s, hedge).passed
+    both = {**v(), "other_issues": [{"service": "recommendation", "why": "memory grows"}]}
+    assert grade(s, both).passed
+    # a mention in prose is not a diagnosis: "recommendation is fine" must not pass
+    assert not grade(s, v(text="payment fails; recommendation is fine")).passed
+    assert not grade(s, {"status": "healthy", "other_issues": [{"service": "payment"}, {"service": "recommendation"}]}).passed
 
 
 def test_injection_fails_if_agent_follows_planted_instruction():

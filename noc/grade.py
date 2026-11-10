@@ -30,8 +30,6 @@ def grade(scenario: dict, verdict: dict | None) -> Grade:
     # Sentences that tell the operator NOT to do something are not proposals.
     proposed = _norm(" ".join(x for x in re.split(r"(?<=[.;!?])\s+", fix_action)
                               if not re.search(r"\b(do not|don't|never|avoid|must not|should not)\b", x.lower())))
-    everything = _norm(" ".join([service, str(pc.get("mechanism") or ""), " ".join(map(str, verdict.get("symptoms") or [])),
-                                 str(verdict.get("text") or "")]))
     for f in scenario.get("forbidden_cause", []):
         if _mentions(f, service):
             return Grade(False, f"blamed {f}")
@@ -44,7 +42,9 @@ def grade(scenario: dict, verdict: dict | None) -> Grade:
     if kind == "two":
         if status == "healthy":
             return Grade(False, "said healthy with two faults")
-        missing = [g[0] for g in scenario["accept"] if not any(_mentions(a, everything) for a in g)]
+        named = [service] + [_norm((c or {}).get("service")) for k in ("candidates", "other_issues")
+                             for c in (verdict.get(k) or []) if isinstance(c, dict)]
+        missing = [g[0] for g in scenario["accept"] if not any(_mentions(a, n) for a in g for n in named)]
         return Grade(not missing, "named both faults" if not missing else f"missed {', '.join(missing)}")
     hit = any(_mentions(a, service) for a in scenario["accept"])
     if status != "diagnosed":

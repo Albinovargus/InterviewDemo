@@ -148,7 +148,7 @@ A second Deployment of one service shares the first one's Service label, so it g
 
 ### Keeping the test fair
 
-The agent's tools cannot see the Chaos Mesh namespace or the flag service. From its point of view, a flag is a code bug and a NetworkChaos object is a flaky network. A reset button removes the fault; metrics take 2–3 minutes to settle afterwards.
+The agent's reduction tools hide the fault tooling: Chaos Mesh's objects and events, and flagd's own logs and spans. From its point of view, a flag is a code bug and a NetworkChaos object is a flaky network. Two honest limits: the demo's services log their own flag names ("FeatureFlag 'kafkaQueueProblems' is activated"), as a real app's logs might, and raw Grafana queries can see that the tooling's pods exist, though not which fault is on. A reset button removes the fault; metrics take 2–3 minutes to settle afterwards.
 
 ### Likely follow-ups
 

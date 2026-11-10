@@ -36,3 +36,10 @@ def test_fault_tooling_events_are_hidden_from_the_agent():
     flagd = {"involvedObject": {"kind": "Pod", "name": "flagd-abc"}, "reason": "Started", "message": ""}
     normal = {"involvedObject": {"kind": "Pod", "name": "cart-abc"}, "reason": "BackOff", "message": "Back-off restarting"}
     assert [clients._hidden_event(e) for e in (chaos, by_controller, flagd, normal)] == [True, True, True, False]
+
+
+def test_reduction_tools_refuse_the_fault_tooling():
+    from noc import tools
+    for fn in (tools.log_pattern_diff, tools.trace_examples):
+        out = fn("flagd")
+        assert "error" in out and "tooling" in out["error"]
