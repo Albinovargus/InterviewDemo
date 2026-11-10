@@ -226,7 +226,7 @@ def scorecard(batch_file: Path, off_menu: dict[str, str] | None = None) -> dict:
                     "independently. A run passes when its primary cause is in the accepted set (graded by code, not by a model). "
                     "Cost is the API-equivalent price Claude Code reports per run."}
     REPLAYS.mkdir(exist_ok=True)
-    (REPLAYS / "scorecard.json").write_text(json.dumps(sc, indent=2))
+    (REPLAYS / "scorecard.json").write_text(json.dumps(sc, indent=2), encoding="utf-8", newline=chr(10))
     return sc
 
 

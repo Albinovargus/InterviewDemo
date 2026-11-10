@@ -31,6 +31,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const fmt = (n) => (n ?? 0).toLocaleString("en-US");
 const clock = (ts) => ts ? new Date(ts * 1000).toISOString().slice(11, 19) + " UTC" : "–";
 const mmss = (s) => s == null ? "–" : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+// The agent writes light markdown: show **bold** and `code`, drop stray markers; everything is escaped first.
+const md = (t) => esc(t).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*|`/g, "");
 const arr = (x) => (Array.isArray(x) ? x : x == null ? [] : [x]);
 const pct = (x) => x == null ? "–" : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`;
 
@@ -505,7 +507,7 @@ function renderRun() {
   const items = r.order.map((id) => {
     const s = r.steps.get(id);
     const t = s.ts && r.start ? mmss(s.ts - r.start) : "";
-    if (s.note) return `<li class="step note"><div class="txt">${esc(s.text.length > 320 ? s.text.slice(0, 320) + "…" : s.text)}</div></li>`;
+    if (s.note) return `<li class="step note"><div class="txt">${md(s.text.length > 320 ? s.text.slice(0, 320) + "…" : s.text)}</div></li>`;
     const what = TOOL_WORDS[s.tool] || s.tool.replace(/_/g, " ");
     const size = s.pending ? "" : ` · ${fmt(s.chars)} chars back`;
     return `<li class="step ${s.pending ? "pending" : ""} ${s.error ? "error" : ""}"><div class="row"><span class="tool">${s.step}. ${esc(s.server)}.${esc(s.tool)}</span><span class="t">${t}${s.dur != null ? ` · ${s.dur.toFixed(1)}s` : ""}</span></div>
