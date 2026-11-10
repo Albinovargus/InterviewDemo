@@ -1,0 +1,9 @@
+.superpowers/
+.secrets/
+bin/
+runs/*.jsonl
+.venv/
+__pycache__/
+*.tfstate*
+.terraform/
+*.pyc
