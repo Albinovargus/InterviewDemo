@@ -214,7 +214,7 @@ def off_menu_reasons() -> dict[str, str]:
 
 
 def scorecard(batch_file: Path, off_menu: dict[str, str] | None = None,
-              reruns: dict[str, tuple[Path, str]] | None = None) -> dict:
+              reruns: dict[str, tuple[Path, str]] | None = None, method_note: str = "") -> dict:
     """Off-menu faults (lab/fault-menu.json) are listed with the reason, whether or not this batch ran them.
     reruns: {scenario: (batch file, why)} replaces that scenario's runs; the row keeps a note with the first result."""
     rows = json.loads(batch_file.read_text())
@@ -251,7 +251,7 @@ def scorecard(batch_file: Path, off_menu: dict[str, str] | None = None,
                     "in parallel, each from scratch, so this measures how consistent the answer is on one incident, not a sample "
                     "of different incidents. A run passes when its primary cause is in the accepted set (graded by code, not by "
                     "a model); an Opus reviewer then read every run's evidence against its tool results. "
-                    "Cost is the API-equivalent price Claude Code reports per run."}
+                    "Cost is the API-equivalent price Claude Code reports per run." + (f" {method_note}" if method_note else "")}
     REPLAYS.mkdir(exist_ok=True)
     (REPLAYS / "scorecard.json").write_text(json.dumps(sc, indent=2), encoding="utf-8", newline=chr(10))
     return sc
@@ -297,11 +297,12 @@ if __name__ == "__main__":
     ap.add_argument("--pick", nargs="*", default=None, help="scenario=run-id pairs to promote by hand (judged best)")
     ap.add_argument("--off-menu", default="", help="comma-separated scenario ids shown as off the menu")
     ap.add_argument("--rerun", nargs="*", default=[], help="scenario=batch-file=why: that scenario's runs come from a re-run")
+    ap.add_argument("--method-note", default="", help="a sentence appended to the scorecard's method line")
     a = ap.parse_args()
     if a.scorecard:
         extra = {k: "taken off the menu after rehearsal" for k in filter(None, a.off_menu.split(","))}
         reruns = {sid: (Path(f), why) for sid, f, why in (x.split("=", 2) for x in a.rerun)}
-        print(json.dumps(scorecard(Path(a.scorecard), {**off_menu_reasons(), **extra}, reruns), indent=2))
+        print(json.dumps(scorecard(Path(a.scorecard), {**off_menu_reasons(), **extra}, reruns, a.method_note), indent=2))
         raise SystemExit(0)
     if a.pick:
         for pair in a.pick:

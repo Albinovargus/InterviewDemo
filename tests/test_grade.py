@@ -102,7 +102,9 @@ def test_scorecard_rerun_replaces_a_scenario_and_says_so(tmp_path, monkeypatch):
     again = tmp_path / "b.json"
     again.write_text(json.dumps([{**row, "scenario": "no-fault", "passed": True, "reason": "said healthy", "run": f"m{i}"}
                                  for i in range(5)]))
-    sc = rehearse.scorecard(first, {}, reruns={"no-fault": (again, "started minutes after the last fault")})
+    sc = rehearse.scorecard(first, {}, reruns={"no-fault": (again, "started minutes after the last fault")},
+                            method_note="Two rows were re-run.")
+    assert sc["method"].endswith("per run. Two rows were re-run.")
     nf = next(r for r in sc["rows"] if r["id"] == "no-fault")
     assert (nf["passed"], nf["runs"]) == (5, 5)
     assert nf["note"] == "Re-run. The first attempt (1 of 5 passed) started minutes after the last fault."
