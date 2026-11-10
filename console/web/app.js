@@ -333,7 +333,7 @@ function renderCallout() {
     const row = (label, v) => v ? `${label}: ${v.rate?.toFixed(2)} req/s · ${pct(v.error_rate)} errors${v.p95_ms != null ? ` · p95 ${Math.round(v.p95_ms)} ms` : ""}` : `${label}: no traffic`;
     c.innerHTML = `<div class="callout ${e.grade === "unexplained" ? "amber" : "info"}">${close}<h3>${esc(e.sentence)}</h3>
       Grade: <b>${esc(e.silent ? "silent (stopped since baseline)" : e.grade)}</b><br>${esc(row("Baseline", e.baseline))}<br>${esc(row("Now", e.now))}
-      <div class="src">${e.evidence.map(esc).join("<br>")}</div><div class="src">sources: ${esc(e.sources.join(" + ") || "none")}</div></div>`;
+      <div class="src">${e.new ? "Why it is on the map (now)" : "Why it is on the map (healthy baseline)"}:<br>${e.evidence.map(esc).join("<br>")}</div><div class="src">sources: ${esc(e.sources.join(" + ") || "none")}</div></div>`;
     return;
   }
   if (S.focus === "unknown") {
