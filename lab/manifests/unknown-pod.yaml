@@ -1,0 +1,26 @@
+# Shadow IT: a bare Pod someone started by hand long ago. No labels, no owner,
+# no Service, no instrumentation. It polls PostgreSQL every ~9 s (~400/hour).
+# Only OBI's network flows can see it.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nightly-sync-7f9c
+  namespace: default
+spec:
+  restartPolicy: Always
+  containers:
+    - name: main
+      image: postgres:18.4
+      env:
+        - {name: PGPASSWORD, value: changeit}
+      command: ["sh", "-c"]
+      args:
+        - |
+          while true; do
+            psql -h astronomy-db.otel-demo.svc.cluster.local -U postgres -d postgres -tAc \
+              "SELECT count(*) FROM pg_stat_activity" >/dev/null 2>&1
+            sleep 9
+          done
+      resources:
+        requests: {memory: 16Mi, cpu: 10m}
+        limits: {memory: 64Mi}

@@ -37,6 +37,20 @@ resource "kind_cluster" "lab" {
     node {
       role = "control-plane"
 
+      # etcd on the node's tmpfs (/tmp). On Docker Desktop's WSL2 disk, etcd
+      # fsyncs stall for seconds under load (image pulls, Loki/Tempo writes),
+      # the control plane loses its leader lease and crash-loops. Memory-backed
+      # etcd removes that failure mode; the cost is that cluster state does not
+      # survive a restart of the node container, and the lab is rebuilt instead.
+      kubeadm_config_patches = [
+        <<-EOT
+        kind: ClusterConfiguration
+        etcd:
+          local:
+            dataDir: /tmp/etcd
+        EOT
+      ]
+
       dynamic "extra_port_mappings" {
         for_each = local.ports
         content {
