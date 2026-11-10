@@ -56,8 +56,10 @@ class Mover:
 
 
 def movers(series: dict[str, list[tuple[float, float]]], baseline: dict[str, float],
-           rel: float = 0.5, abs_floor: float = 1e-9) -> list[Mover]:
-    """Signals that left their baseline, earliest first. Silence and absence count as moves."""
+           rel: float = 0.5, abs_floor: float = 1e-9,
+           per_signal: dict[str, tuple[float, float]] | None = None) -> list[Mover]:
+    """Signals that left their baseline, earliest first. Silence and absence count as moves.
+    per_signal: {label suffix: (rel, floor)} overrides the thresholds for signals named "<service> · <label>"."""
     out: list[tuple[float, float, Mover]] = []
     for name, b in baseline.items():
         pts = series.get(name) or []
@@ -65,7 +67,8 @@ def movers(series: dict[str, list[tuple[float, float]]], baseline: dict[str, flo
             if b > 0:
                 out.append((float("inf"), 0.0, Mover(name, "missing", b, None, None)))
             continue
-        threshold = max(rel * abs(b), abs_floor)
+        r, f = (per_signal or {}).get(name.rsplit(" · ", 1)[-1], (rel, abs_floor))
+        threshold = max(r * abs(b), f)
         for t, v in pts:
             if abs(v - b) > threshold:
                 latest = pts[-1][1]

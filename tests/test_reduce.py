@@ -87,3 +87,13 @@ def test_mover_reports_the_value_it_moved_to_as_well_as_the_latest():
     assert len(out) == 1
     m = out[0]
     assert (m.kind, m.moved_to, m.latest, m.first_moved_at) == ("dropped_to_zero", 0.0, 3535.0, 2.0)
+
+
+def test_movers_per_signal_thresholds_catch_one_restart_and_ignore_small_lag():
+    series = {"cart · restarts": [(1, 5.0), (2, 6.0)],          # one new restart on a pod that had 5
+              "accounting · consumer lag": [(1, 0.0)],           # lag 3 -> 0 is noise, not an outage
+              "fraud-detection · consumer lag": [(1, 400.0)]}
+    baseline = {"cart · restarts": 5.0, "accounting · consumer lag": 3.0, "fraud-detection · consumer lag": 3.0}
+    floors = {"restarts": (0.0, 0.5), "consumer lag": (0.5, 50.0)}
+    got = {m.signal: m.kind for m in movers(series, baseline, rel=0.5, abs_floor=0.02, per_signal=floors)}
+    assert got == {"cart · restarts": "rose", "fraud-detection · consumer lag": "rose"}

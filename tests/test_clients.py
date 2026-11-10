@@ -55,3 +55,42 @@ def test_trace_examples_drops_spans_that_call_the_fault_tooling(monkeypatch):
     out = tools.trace_examples("payment")
     assert "flagd" not in str(out["examples"])
     assert out["examples"][0]["spans"][0]["span"] == "Charge"
+
+
+def test_a_timeout_is_not_retried_and_says_to_narrow(monkeypatch):
+    import httpx
+    calls = []
+
+    def slow(url, params=None, headers=None):
+        calls.append(url)
+        raise httpx.ReadTimeout("slow")
+
+    monkeypatch.setattr(clients._http, "get", slow)
+    try:
+        clients._get("http://loki/x")
+    except clients.QueryError as e:
+        assert "timed out" in str(e) and "narrower" in str(e)
+    else:
+        raise AssertionError("expected QueryError")
+    assert len(calls) == 1
+
+
+def test_loki_lines_retries_a_timed_out_window_once_with_fewer_lines(monkeypatch):
+    asked = []
+
+    def fake_get(url, params=None, headers=None, attempts=3):
+        asked.append(params["limit"])
+        if params["limit"] > 500:
+            raise clients.QueryError("http://loki timed out after 20 s; ask for a narrower window")
+        return {"data": {"result": [{"values": [["1", "a"]]}]}}
+
+    monkeypatch.setattr(clients, "_get", fake_get)
+    assert clients.loki_lines("{x}", 0, 1, limit=5000) == ["a"]
+    assert asked == [5000, 500]
+
+
+def test_client_error_rate_is_a_fraction_of_calls():
+    from noc import tools
+    q = tools._signals(["payment"])
+    assert " / " in q["client error rate"]
+    assert 'group=~"(payment)"' in q["consumer lag"]

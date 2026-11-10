@@ -37,6 +37,9 @@ def _get(url: str, params: dict | None = None, headers: dict | None = None, atte
     for i in range(attempts):
         try:
             r = _http.get(url, params=params, headers=headers)
+        except httpx.TimeoutException:
+            # A query this slow is heavy, not transient: retrying costs another 20 s for the same answer.
+            raise QueryError(f"{url.split('/api')[0]} timed out after 20 s; ask for a narrower window or fewer lines")
         except httpx.HTTPError as e:
             last = f"{url} unreachable ({e.__class__.__name__}); the backend may be restarting, retry in 30 s"
         else:
@@ -98,6 +101,9 @@ def loki_lines(selector: str, start: float, end: float, limit: int = 3) -> list[
                                                          "direction": "backward"})
             break
         except QueryError as e:
+            if "timed out" in str(e) and limit > 500:
+                limit = 500  # one retry with far fewer lines
+                continue
             if "larger than max" not in str(e) or limit <= 250:
                 raise
             limit //= 2

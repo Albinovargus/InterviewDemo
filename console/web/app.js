@@ -694,7 +694,7 @@ async function renderScorecard(doc) {
     ${(sc.rows || []).map((x) => {
       const off = x.on_menu === false;
       const pill = off ? ["off", "off the menu"] : x.passed === x.runs ? ["pass", "pass"] : x.passed ? ["fail", "mixed"] : ["fail", "fail"];
-      return `<tr><td>${esc(x.title)}<br><span class="hint">${esc(off ? x.off_reason || "" : x.expect || "")}</span></td>
+      return `<tr><td>${esc(x.title)}<br><span class="hint">${esc(off ? x.off_reason || "" : x.expect || "")}</span>${x.note ? `<br><span class="hint">${esc(x.note)}</span>` : ""}</td>
       <td class="num">${x.runs ? `${x.passed} / ${x.runs}` : "–"}</td>
       <td class="num">${x.median_s != null ? esc(mmss(x.median_s)) : "–"}</td><td class="num">${x.median_usd != null ? "$" + x.median_usd.toFixed(2) : "–"}</td>
       <td><span class="pill ${pill[0]}">${pill[1]}</span></td></tr>`; }).join("")}

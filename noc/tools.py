@@ -171,11 +171,18 @@ def _signals(services: list[str]) -> dict[str, str]:
         "error rate": f'sum by (service)(rate(traces_spanmetrics_calls_total{{service=~"{sel}",span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER",status_code="STATUS_CODE_ERROR"}}[1m]))'
                       f' / sum by (service)(rate(traces_spanmetrics_calls_total{{service=~"{sel}",span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER"}}[1m]))',
         "p95 latency ms": f'1000 * histogram_quantile(0.95, sum by (service, le)(rate(traces_spanmetrics_latency_bucket{{service=~"{sel}",span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER"}}[1m])))',
-        "client error rate": f'sum by (service)(rate(traces_spanmetrics_calls_total{{service=~"{sel}",span_kind=~"SPAN_KIND_CLIENT|SPAN_KIND_PRODUCER",status_code="STATUS_CODE_ERROR"}}[1m]))',
+        "client error rate": f'sum by (service)(rate(traces_spanmetrics_calls_total{{service=~"{sel}",span_kind=~"SPAN_KIND_CLIENT|SPAN_KIND_PRODUCER",status_code="STATUS_CODE_ERROR"}}[1m]))'
+                             f' / sum by (service)(rate(traces_spanmetrics_calls_total{{service=~"{sel}",span_kind=~"SPAN_KIND_CLIENT|SPAN_KIND_PRODUCER"}}[1m]))',
         "restarts": f'sum by (service)(label_replace(k8s_container_restarts{{k8s_namespace_name="otel-demo"}}, "service", "$1", "k8s_container_name", "({sel})"))',
         "memory MiB": f'sum by (service)(label_replace(container_memory_working_set_bytes{{k8s_namespace_name="otel-demo"}}, "service", "$1", "k8s_container_name", "({sel})")) / 1048576',
-        "consumer lag": 'sum by (service)(label_replace(kafka_consumer_group_lag_sum_ratio, "service", "$1", "group", "(.*)"))',
+        "consumer lag": f'sum by (service)(label_replace(kafka_consumer_group_lag_sum_ratio{{group=~"({sel})"}}, "service", "$1", "group", "(.*)"))',
     }
+
+
+# (relative change, absolute floor) per signal. Restarts are a running count: one new restart is a move however
+# many came before. Lag below 50 messages is normal churn (the alert fires at 100).
+SIGNAL_THRESHOLDS = {"restarts": (0.0, 0.5), "consumer lag": (0.5, 50.0), "p95 latency ms": (0.5, 2.0),
+                     "memory MiB": (0.5, 20.0)}
 
 
 def metric_movers(services: list[str] | None = None, window_minutes: int = 15) -> dict:
@@ -202,13 +209,14 @@ def metric_movers(services: list[str] | None = None, window_minutes: int = 15) -
             elif inc_pts and max(v for _, v in inc_pts) > 0:
                 baseline[name] = 0.0  # signal appeared from nothing
             series[name] = inc_pts
-    moved = movers(series, baseline, rel=0.5, abs_floor=0.02)
+    moved = movers(series, baseline, rel=0.5, abs_floor=0.02, per_signal=SIGNAL_THRESHOLDS)
     rows = [{"signal": m.signal, "first_move": m.kind, "baseline": round(m.baseline, 3),
              "moved_to": None if m.moved_to is None else round(m.moved_to, 3),
              "latest": None if m.latest is None else round(m.latest, 3),
              "first_moved": _ago(m.first_moved_at) if m.first_moved_at else None} for m in moved]
     kept, note = fit(rows, BUDGET - 400, "pass fewer services")
     out = {"baseline_window": f"{_ago(b0)}–{_ago(b1)}", "incident_window": f"{_ago(i0)}–{_ago(i1)}",
+           "units": "error rates are fractions of calls (0.05 = 5%); restarts are a running count per pod",
            "movers": kept, "counts": {"scanned_series_points": scanned, "signals": len(series), "moved": len(moved)}}
     if not series:
         out["message"] = NO_DATA
