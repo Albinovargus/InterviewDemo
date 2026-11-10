@@ -95,3 +95,12 @@ def test_assistant_text_becomes_thinking_note():
     n = Normaliser()
     out = n.feed(assistant({"type": "text", "text": "Checking what changed first."}), ts=3.0)
     assert out[0].type == "narration" and out[0].data["text"] == "Checking what changed first."
+
+
+def test_prefetch_results_count_toward_the_counter():
+    n = Normaliser()
+    out = n.add_prefetch({"service_map": {"edges": [], "counts": {"scanned_requests": 22000, "edges": 23, "changed_edges": 2}},
+                          "incident_summary": {"counts": {"alerts": 3}}})
+    assert out.type == "counter"
+    assert out.data["scanned"] == 22000 and out.data["found"] == 23 and out.data["anomalous"] == 2
+    assert out.data["tokens_to_model"] > 0

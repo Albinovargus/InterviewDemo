@@ -4,7 +4,7 @@
   uv run python -m noc.rehearse --model claude-opus-5-5 --effort high --runs 5 --parallel 5
 
 Writes runs/rehearsal-<batch>.json (one row per agent run, plus the alerts each injection raised).
-`--scorecard` turns a batch into runs/scorecard.json for the console.
+`--scorecard` turns a batch into replays/scorecard.json for the console.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from pathlib import Path
 
 from noc import clients, faults, tools
 from noc.agent_run import RUNS, read_run, run_agent
+from noc.console import REPLAYS
 from noc.events import Normaliser
 from noc.grade import grade
 
@@ -205,8 +206,31 @@ def scorecard(batch_file: Path, off_menu: set[str] = frozenset()) -> dict:
           "method": "Each scenario is injected once into the live lab; the agents start 90 s after the first alert and run "
                     "independently. A run passes when its primary cause is in the accepted set (graded by code, not by a model). "
                     "Cost is the API-equivalent price Claude Code reports per run."}
-    (RUNS / "scorecard.json").write_text(json.dumps(sc, indent=2))
+    REPLAYS.mkdir(exist_ok=True)
+    (REPLAYS / "scorecard.json").write_text(json.dumps(sc, indent=2))
     return sc
+
+
+def promote_best(batch_file: Path) -> list[str]:
+    """Per scenario, copy the passing run closest to the median time into replays/, titled for the console."""
+    rows = json.loads(batch_file.read_text())
+    REPLAYS.mkdir(exist_ok=True)
+    out = []
+    for s in summarise(rows):
+        good = [r for r in rows if r["scenario"] == s["id"] and r["passed"] and r.get("run") and r.get("duration_s")]
+        if not good:
+            out.append(f"{s['id']}: no passing run, nothing promoted")
+            continue
+        best = min(good, key=lambda r: abs(r["duration_s"] - (s["median_s"] or 0)))
+        sc = SCENARIOS[s["id"]]
+        lines = (RUNS / f"{best['run']}.jsonl").read_text(encoding="utf-8").splitlines()
+        first = json.loads(lines[0])
+        first["meta"].update(title=sc["title"], scenario=s["id"], beat=sc["beat"], label="recorded real run")
+        lines[0] = json.dumps(first)
+        dest = REPLAYS / f"{s['id']}.jsonl"
+        dest.write_text(chr(10).join(lines) + chr(10), encoding="utf-8")
+        out.append(f"{s['id']}: {best['run']} ({best['duration_s']}s, {best['reason']}) -> {dest.name}")
+    return out
 
 
 if __name__ == "__main__":
@@ -218,10 +242,15 @@ if __name__ == "__main__":
     ap.add_argument("--parallel", type=int, default=5)
     ap.add_argument("--batch", default=None)
     ap.add_argument("--scorecard", default=None, help="batch file to turn into runs/scorecard.json")
+    ap.add_argument("--promote", default=None, help="batch file: copy each scenario's representative passing run into replays/")
     ap.add_argument("--off-menu", default="", help="comma-separated scenario ids shown as off the menu")
     a = ap.parse_args()
     if a.scorecard:
         print(json.dumps(scorecard(Path(a.scorecard), set(filter(None, a.off_menu.split(",")))), indent=2))
+        raise SystemExit(0)
+    if a.promote:
+        for line in promote_best(Path(a.promote)):
+            print(line)
         raise SystemExit(0)
     batch = a.batch or time.strftime("%m%dT%H%M")
     out = RUNS / f"rehearsal-{batch}.json"

@@ -11,9 +11,9 @@ from dataclasses import dataclass, field
 
 COUNT_KEYS = ("scanned", "found", "anomalous", "tokens_to_model")
 # How each tool's own `counts` keys roll up into the console's four counters.
-_ROLLUP = {"scanned": ("scanned_log_lines", "scanned_series_points"),
-           "found": ("patterns", "signals"),
-           "anomalous": ("anomalous", "moved")}
+_ROLLUP = {"scanned": ("scanned_log_lines", "scanned_series_points", "scanned_requests", "scanned_traces", "scanned_events"),
+           "found": ("patterns", "signals", "edges"),
+           "anomalous": ("anomalous", "moved", "changed_edges")}
 
 
 @dataclass
@@ -118,12 +118,22 @@ class Normaliser:
                 counts = parsed.get("counts") if isinstance(parsed, dict) else None
             except (json.JSONDecodeError, TypeError):
                 pass
-            if isinstance(counts, dict):
-                for k, keys in _ROLLUP.items():
-                    self.totals[k] += sum(int(counts.get(c, 0) or 0) for c in keys)
-            self.totals["tokens_to_model"] += len(text) // 4 + 1
+            self._count(counts, text)
             out.append(UiEvent("counter", ts, dict(self.totals)))
         return out
+
+    def _count(self, counts, text: str) -> None:
+        if isinstance(counts, dict):
+            for k, keys in _ROLLUP.items():
+                self.totals[k] += sum(int(counts.get(c, 0) or 0) for c in keys)
+        self.totals["tokens_to_model"] += len(text) // 4 + 1
+
+    def add_prefetch(self, prefetch: dict, ts: float = 0.0) -> UiEvent:
+        """The first prompt carries incident_summary and service_map results: they count too."""
+        for key in ("incident_summary", "service_map"):
+            if key in prefetch:
+                self._count(prefetch[key].get("counts"), json.dumps(prefetch[key], indent=1))
+        return UiEvent("counter", ts, dict(self.totals))
 
     def _result(self, ev: dict, ts: float) -> list[UiEvent]:
         self.finished = True

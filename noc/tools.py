@@ -97,8 +97,10 @@ def service_map(compare_to_baseline: bool = True, window_minutes: int = 5) -> di
     base = load_baseline() if compare_to_baseline else None
     edges = []
     silent = []
+    changed = 0
     if base:
         diff = compare(base, now)
+        changed = len(diff.silent) + len(diff.changed) + len(diff.new)
         silent = [{"edge": e.sentence(), "baseline_rate": e.rate, "grade": "silent",
                    "meaning": "active in the healthy baseline, no traffic now"} for e in diff.silent]
     for e in now.edges:
@@ -114,7 +116,10 @@ def service_map(compare_to_baseline: bool = True, window_minutes: int = 5) -> di
     out = {"window": f"last {window_minutes} min", "edges": kept, "silent_edges": silent,
            "how_to_read": "'A calls B' means A depends on B. Errors in B surface as errors in A.",
            "uninstrumented": sorted(n for n, v in now.nodes.items() if not v.get("instrumented")),
-           "unlabelled": sorted(n for n, v in now.nodes.items() if not v.get("labelled") and v.get("kind") != "virtual")}
+           "unlabelled": sorted(n for n, v in now.nodes.items() if not v.get("labelled") and v.get("kind") != "virtual"),
+           # requests summarised = traced calls behind the edges in this window
+           "counts": {"scanned_requests": int(sum(e.rate for e in now.edges) * window_minutes * 60),
+                      "edges": len(now.edges), "changed_edges": changed}}
     if not base:
         out["baseline"] = "missing: no healthy baseline saved, so silent edges cannot be detected"
     if note:
@@ -142,7 +147,8 @@ def what_changed(minutes_before_first_alert: int = 30) -> dict:
     ev_kept, note = fit(events, 1500, "narrow minutes_before_first_alert")
     note = note or r_note
     out = {"since": _ago(since), "commits": commits, "rollouts": rollouts, "kubernetes_events": ev_kept,
-           "summary": f"{len(commits)} commits, {len(rollouts)} rollouts, {len(events)} notable Kubernetes events"}
+           "summary": f"{len(commits)} commits, {len(rollouts)} rollouts, {len(events)} notable Kubernetes events",
+           "counts": {"scanned_events": len(commits) + len(rollouts) + len(events)}}
     if note:
         out["truncated"] = note
     return out
@@ -289,7 +295,7 @@ def trace_examples(service: str, only_errors: bool = True, limit: int = 3) -> di
         examples.append({"trace": _handles.short(t["traceID"]), "root": f'{t.get("rootServiceName")}: {t.get("rootTraceName")}',
                          "duration_ms": t.get("durationMs"), "spans_total": len(rows), "spans": chain})
     kept, note = fit(examples, BUDGET - 200, "use limit=1")
-    out = {"service": service, "query": q, "examples": kept, "counts": {"traces_matched": len(found)}}
+    out = {"service": service, "query": q, "examples": kept, "counts": {"scanned_traces": len(found)}}
     if not found:
         out["message"] = (f"No {'error ' if only_errors else ''}traces for {service} in the incident window. "
                           "Absence of error traces is not proof of health: the service may not be traced, "

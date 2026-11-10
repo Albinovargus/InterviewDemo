@@ -214,3 +214,8 @@ a { color: var(--blue-soft); } a:hover { color: #B5DCFF; }
 @keyframes blink { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 @media (max-width: 1200px) { .body { grid-template-columns: 190px minmax(0, 1fr) 360px; } }
+
+/* compact verdict: the steps list keeps its room */
+.verdict { max-height: 46vh; overflow-y: auto; }
+.verdict .actions .btn { min-height: 36px; padding: 0 12px; font-size: 12px; }
+.verdict h3 { font-size: 16px; }

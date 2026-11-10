@@ -25,7 +25,7 @@ from noc.events import Normaliser
 
 WEB = clients.ROOT / "console" / "web"
 REPLAYS = clients.ROOT / "replays"
-SCORECARD = RUNS / "scorecard.json"
+SCORECARD = REPLAYS / "scorecard.json"  # committed with the replays it summarises
 DEMO_MODEL, DEMO_EFFORT = "claude-opus-5-5", "high"
 
 log = logging.getLogger("console")
@@ -204,6 +204,7 @@ async def _stream(path: Path, live: RunHandle | None, speed: float):
             elif "prefetch" in rec:
                 p = rec["prefetch"]
                 yield _sse({"type": "prefetch", "ts": ts, "data": p})
+                yield _sse(n.add_prefetch(p, ts).to_dict())
             elif "raw" in rec:
                 for ev in n.feed(rec["raw"], ts):
                     yield _sse(ev.to_dict())

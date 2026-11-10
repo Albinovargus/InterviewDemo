@@ -532,11 +532,17 @@ function renderVerdict(r) {
   if (!v) { box.innerHTML = ""; return; }
   const status = ["diagnosed", "uncertain", "healthy"].includes(v.status) ? v.status : "uncertain";
   const pc = v.primary_cause || {};
-  const head = status === "healthy" ? "No incident: the estate looks healthy" : status === "uncertain" ? (pc.service ? `Probably ${pc.service}, not certain` : "Not certain") : `${pc.service || "?"}`;
+  const cands = (v.candidates || []).map((c) => c.service).filter(Boolean);
+  const head = status === "healthy" ? "No incident: the estate looks healthy"
+    : status === "uncertain" ? (cands.length ? `Not certain: ${cands.join(" or ")}` : pc.service ? `Probably ${pc.service}, not certain` : "Not certain")
+    : `${pc.service || "?"}`;
+  const body = status === "uncertain"
+    ? (v.candidates || []).map((c) => `<p><b>${esc(c.service)}:</b> ${esc(c.why || "")}</p>`).join("") + (v.deciding_query ? `<p><b>Query that would decide:</b> ${esc(v.deciding_query)}</p>` : "")
+    : status === "healthy" ? (v.why ? `<p>${esc(v.why)}</p>` : "") : (pc.mechanism ? `<p>${esc(pc.mechanism)}</p>` : "");
   const key = JSON.stringify([status, head, v.confidence, r.cost?.usd]);
   if (box.dataset.key === key) return; box.dataset.key = key;
   box.innerHTML = `<div class="verdict ${status}"><div class="k">${esc(status === "diagnosed" ? "Primary cause" : status)}<span>confidence ${esc(v.confidence || "–")}</span></div>
-    <h3>${esc(head)}</h3>${pc.mechanism ? `<p>${esc(pc.mechanism)}</p>` : ""}
+    <h3>${esc(head)}</h3>${body}
     ${(v.symptoms || []).length ? `<p><b>Symptoms, not causes:</b> ${esc(v.symptoms.join(", "))}</p>` : ""}
     <div class="actions"><button class="btn" id="v-evidence">Evidence (${(v.evidence || []).length})</button>
     ${v.proposed_fix ? `<button class="btn" onclick="setBeat(6)">Proposed fix</button>` : ""}${v.postmortem ? `<button class="btn" onclick="setBeat(8)">Postmortem</button>` : ""}</div></div>`;
