@@ -9,7 +9,11 @@ import json
 import re
 from dataclasses import dataclass, field
 
-COUNT_KEYS = ("scanned_log_lines", "patterns", "anomalous", "returned")
+COUNT_KEYS = ("scanned", "found", "anomalous", "tokens_to_model")
+# How each tool's own `counts` keys roll up into the console's four counters.
+_ROLLUP = {"scanned": ("scanned_log_lines", "scanned_series_points"),
+           "found": ("patterns", "signals"),
+           "anomalous": ("anomalous", "moved")}
 
 
 @dataclass
@@ -115,9 +119,10 @@ class Normaliser:
             except (json.JSONDecodeError, TypeError):
                 pass
             if isinstance(counts, dict):
-                for k in COUNT_KEYS:
-                    self.totals[k] += int(counts.get(k, 0) or 0)
-                out.append(UiEvent("counter", ts, dict(self.totals)))
+                for k, keys in _ROLLUP.items():
+                    self.totals[k] += sum(int(counts.get(c, 0) or 0) for c in keys)
+            self.totals["tokens_to_model"] += len(text) // 4 + 1
+            out.append(UiEvent("counter", ts, dict(self.totals)))
         return out
 
     def _result(self, ev: dict, ts: float) -> list[UiEvent]:

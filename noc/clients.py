@@ -31,14 +31,23 @@ class QueryError(RuntimeError):
     pass
 
 
-def _get(url: str, params: dict | None = None, headers: dict | None = None) -> dict:
-    try:
-        r = _http.get(url, params=params, headers=headers)
-    except httpx.HTTPError as e:
-        raise QueryError(f"{url} unreachable ({e.__class__.__name__}); the backend may be restarting, retry in 30 s")
-    if r.status_code >= 400:
-        raise QueryError(f"{url} returned {r.status_code}: {r.text[:300]}")
-    return r.json()
+def _get(url: str, params: dict | None = None, headers: dict | None = None, attempts: int = 3) -> dict:
+    """GET with retries: backends on a laptop stall briefly under disk load (Grafana's SQLite most of all)."""
+    last = ""
+    for i in range(attempts):
+        try:
+            r = _http.get(url, params=params, headers=headers)
+        except httpx.HTTPError as e:
+            last = f"{url} unreachable ({e.__class__.__name__}); the backend may be restarting, retry in 30 s"
+        else:
+            if r.status_code < 500:
+                if r.status_code >= 400:
+                    raise QueryError(f"{url} returned {r.status_code}: {r.text[:300]}")
+                return r.json()
+            last = f"{url} returned {r.status_code}: {r.text[:300]}"
+        if i < attempts - 1:
+            time.sleep(1.5 * (i + 1))
+    raise QueryError(last)
 
 
 # ---- Prometheus -------------------------------------------------------------

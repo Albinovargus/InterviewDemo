@@ -23,17 +23,27 @@ def test_tool_call_and_result_pair_by_id_and_strip_server_prefix():
     kinds = [e.type for e in out]
     assert kinds == ["tool_result", "counter"]
     assert out[0].data["tool"] == "log_pattern_diff" and out[0].data["duration_s"] == 2.5
-    assert out[1].data == {"scanned_log_lines": 120000, "patterns": 80, "anomalous": 4, "returned": 3}
+    assert out[1].data == {"scanned": 120000, "found": 80, "anomalous": 4,
+                           "tokens_to_model": len(TOOL_RESULT_TEXT) // 4 + 1}
 
 
 def test_counter_accumulates_across_tools():
     n = Normaliser()
     for i, counts in enumerate([{"scanned_log_lines": 100, "patterns": 10, "anomalous": 2, "returned": 2},
-                                {"scanned_log_lines": 50, "patterns": 5, "anomalous": 1, "returned": 1}]):
+                                {"scanned_series_points": 5000, "signals": 40, "moved": 3}]):
         n.feed(assistant({"type": "tool_use", "id": f"t{i}", "name": "mcp__reduction__x", "input": {}}), ts=0)
         out = n.feed({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": f"t{i}",
                                                                "content": json.dumps({"counts": counts})}]}}, ts=1)
-    assert out[-1].data == {"scanned_log_lines": 150, "patterns": 15, "anomalous": 3, "returned": 3}
+    assert {k: v for k, v in out[-1].data.items() if k != "tokens_to_model"} == {"scanned": 5100, "found": 50, "anomalous": 5}
+
+
+def test_counter_counts_tokens_for_results_without_counts():
+    n = Normaliser()
+    n.feed(assistant({"type": "tool_use", "id": "g1", "name": "mcp__grafana__query_prometheus", "input": {}}), ts=0)
+    out = n.feed({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "g1",
+                                                           "content": "x" * 400}]}}, ts=1)
+    assert [e.type for e in out] == ["tool_result", "counter"]
+    assert out[1].data == {"scanned": 0, "found": 0, "anomalous": 0, "tokens_to_model": 101}
 
 
 def test_verdict_extracted_from_final_text():

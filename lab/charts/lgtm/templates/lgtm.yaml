@@ -30,6 +30,11 @@ spec:
           env:
             # Loki's pattern ingester is off by default; the demo needs it.
             - {name: LOKI_EXTRA_ARGS, value: "-pattern-ingester.enabled=true"}
+            # SQLite on a laptop disk: WAL mode stops "database is locked" (sqlstore.max-retries-reached)
+            # under alert evaluation; state history adds writes the demo never reads.
+            - {name: GF_DATABASE_WAL, value: "true"}
+            - {name: GF_DATABASE_QUERY_RETRIES, value: "5"}
+            - {name: GF_UNIFIED_ALERTING_STATE_HISTORY_ENABLED, value: "false"}
             - {name: GF_AUTH_ANONYMOUS_ENABLED, value: "true"}
             - {name: GF_AUTH_ANONYMOUS_ORG_ROLE, value: "Viewer"}
             - {name: GF_SECURITY_ADMIN_USER, value: "admin"}

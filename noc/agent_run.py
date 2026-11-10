@@ -51,7 +51,9 @@ def first_prompt() -> tuple[str, dict]:
               f"Incident summary (from incident_summary):\n```json\n{json.dumps(inc, indent=1)}\n```\n\n"
               f"Service map now vs the healthy baseline (from service_map):\n```json\n{json.dumps(smap, indent=1)}\n```\n\n"
               "Investigate and give your answer in the required format.")
-    return prompt, {"incident_summary": inc, "service_map": smap}
+    # The console's own view at the same moment, so a replay draws exactly what the live screen showed.
+    from noc import mapview
+    return prompt, {"incident_summary": inc, "service_map": smap, "map_view": mapview.payload(), "alerts": mapview.alerts()}
 
 
 @dataclass

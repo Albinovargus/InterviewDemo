@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blast Radius</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Ccircle cx=%278%27 cy=%278%27 r=%276%27 fill=%27none%27 stroke=%27%23F5A524%27 stroke-width=%272%27/%3E%3Ccircle cx=%278%27 cy=%278%27 r=%272%27 fill=%27%23F5A524%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><b>Blast Radius</b><span>AI-assisted NOC · lab estate</span></div>
+    <div class="seg" role="group" aria-label="Mode">
+      <button id="mode-live" aria-pressed="true">Live</button>
+      <button id="mode-replay" aria-pressed="false">Replay</button>
+    </div>
+    <span class="badge" id="replay-badge" hidden></span>
+    <div class="spacer"></div>
+    <div class="stats">
+      <span><span class="dot" id="alert-dot"></span><b id="stat-alerts">0</b> alerts firing</span>
+      <span><span class="dot" id="backend-dot"></span><b id="stat-backends">…</b></span>
+      <span>run <b id="stat-time">–</b></span>
+      <span title="What this run would cost at API prices">API-equivalent cost <b id="stat-cost">–</b></span>
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="rail" aria-label="Demo beats">
+      <h2>Beats</h2>
+      <div id="beats"></div>
+      <div class="rail-foot">
+        <button class="btn warn" id="reset-btn">Reset lab</button>
+        <div class="hint" id="reset-hint">Clears every fault. Allow 2–3 min for metrics to settle.</div>
+      </div>
+    </nav>
+
+    <main class="stage">
+      <div class="stage-head">
+        <div><h1 id="beat-title"></h1><p id="beat-lede"></p></div>
+        <div class="toolbar" id="stage-tools"></div>
+      </div>
+
+      <section class="view" id="view-map">
+        <div class="toolbar" id="fault-bar" hidden></div>
+        <div class="map" id="map">
+          <div class="legend">
+            <span><i></i><b>confirmed</b> traces + eBPF</span>
+            <span><i class="likely"></i><b>likely</b> one source</span>
+            <span><i class="unexplained"></i><b>unexplained</b></span>
+            <span><i class="silent"></i><b>silent</b> stopped</span>
+            <span><i class="failing"></i><b>failing</b></span>
+          </div>
+          <svg id="map-svg" aria-label="Service dependency map"></svg>
+          <div id="map-nodes"></div>
+        </div>
+        <div id="map-callout"></div>
+        <div class="card counter" id="counter" hidden>
+          <div class="counter-head"><b>What the model actually read</b><span>Code and queries reduce telemetry before Claude sees it</span></div>
+          <div class="funnel">
+            <div><div class="v" id="c-scanned">0</div><div class="l">rows scanned by code</div><div class="bar"><div id="b-scanned" style="background:var(--grey)"></div></div></div>
+            <div><div class="v" id="c-found">0</div><div class="l">patterns and signals</div><div class="bar"><div id="b-found" style="background:var(--blue)"></div></div></div>
+            <div><div class="v" id="c-anomalous">0</div><div class="l">anomalous</div><div class="bar"><div id="b-anomalous" style="background:var(--coral)"></div></div></div>
+            <div><div class="v" id="c-tokens">0</div><div class="l">tokens sent to Claude</div><div class="bar"><div id="b-tokens" style="background:var(--amber)"></div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view card" id="view-arch" hidden><div class="arch" id="arch"></div></section>
+      <section class="view card" id="view-doc" hidden><div class="doc" id="doc"></div></section>
+    </main>
+
+    <aside class="side">
+      <section>
+        <div class="side-head"><h2>Alerts</h2><span id="alerts-sub">Grafana alerting</span></div>
+        <div class="alerts" id="alerts"><div class="empty">No alerts firing.</div></div>
+      </section>
+      <section class="steps-wrap">
+        <div class="side-head"><h2>Agent steps</h2><span id="steps-sub">idle</span></div>
+        <ol class="steps" id="steps"><li class="empty">No investigation yet.</li></ol>
+      </section>
+      <div id="verdict"></div>
+    </aside>
+  </div>
+</div>
+
+<div class="modal-back" id="modal" hidden><div class="modal" role="dialog" aria-modal="true" id="modal-body"></div></div>
+<div class="toast" id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

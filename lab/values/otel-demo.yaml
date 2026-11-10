@@ -16,6 +16,17 @@ components:
     # and checkout, then sees steady traffic, so error-rate alerts do not flap.
     envOverrides:
       - {name: LOCUST_USERS, value: "25"}
+    resources: {limits: {memory: 2500Mi}}
+  # Chart limits are sized for 5 users; at 25 these sat at 80-88% of their limit,
+  # so MemoryNearLimit fired with no fault. Headroom keeps that alert meaningful.
+  accounting:
+    resources: {limits: {memory: 400Mi}}
+  kafka:
+    resources: {limits: {memory: 1200Mi}}
+  fraud-detection:
+    resources: {limits: {memory: 600Mi}}
+  ad:
+    resources: {limits: {memory: 600Mi}}
   frontend-proxy:
     service:
       type: NodePort
