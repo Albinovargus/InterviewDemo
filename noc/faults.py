@@ -113,6 +113,23 @@ def write_flags(doc: dict) -> None:
              f"cat > {FLAG_FILE}.tmp && mv {FLAG_FILE}.tmp {FLAG_FILE}", stdin=body)
 
 
+def flag_variant(flag: str) -> str:
+    """What flagd actually serves right now, asked through the hidden probe pod."""
+    out = _kubectl("-n", "chaos-mesh", "exec", "fault-probe", "--", "curl", "-s", "-X", "POST",
+                   "-H", "Content-Type: application/json", "-d", '{"context":{}}',
+                   f"http://flagd.{NS}:8016/ofrep/v1/evaluate/flags/{flag}")
+    return json.loads(out).get("variant", "?")
+
+
+def _await_flag(flag: str, variant: str, timeout_s: float = 20.0) -> None:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if flag_variant(flag) == variant:
+            return
+        time.sleep(1)
+    raise RuntimeError(f"flagd still does not serve {flag}={variant} after {timeout_s:.0f}s")
+
+
 def _git(*args: str) -> str:
     p = subprocess.run(["git", "-C", str(GITOPS), *args], capture_output=True, text=True, timeout=30)
     if p.returncode != 0:
@@ -158,6 +175,7 @@ def inject(fault_id: str) -> InjectionRecord:
     f = FAULTS[fault_id]
     if f.mechanism == "flag":
         write_flags(set_flag(read_flags(), f.flag, f.variant))
+        _await_flag(f.flag, f.variant)
     elif f.mechanism == "chaos":
         _kubectl("apply", "-f", str(CHAOS_DIR / f.chaos_file))
     else:
@@ -185,6 +203,8 @@ def reset_all() -> ResetReport:
         doc = set_flag(doc, k, off)
     if changed:
         write_flags(doc)
+        for k in changed:
+            _await_flag(k, doc["flags"][k]["defaultVariant"])
         actions.append(f"flags off: {', '.join(sorted(changed))}")
     for obj in chaos_objects():
         _kubectl("-n", "chaos-mesh", "delete", obj, "--wait=true")

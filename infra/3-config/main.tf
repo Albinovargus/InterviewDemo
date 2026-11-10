@@ -47,6 +47,10 @@ resource "kubernetes_manifest" "unknown_pod" {
   manifest = yamldecode(file("${local.lab}/manifests/unknown-pod.yaml"))
 }
 
+resource "kubernetes_manifest" "fault_probe" {
+  manifest = yamldecode(file("${local.lab}/manifests/probe.yaml"))
+}
+
 # ---- The agent's read-only Grafana identity --------------------------------------
 
 resource "grafana_service_account" "agent" {

@@ -18,6 +18,10 @@ components:
 
 opentelemetry-collector:
   config:
+    receivers:
+      # kind's kubelet serves a self-signed certificate.
+      kubeletstats:
+        insecure_skip_verify: true
     exporters:
       otlp_http/lgtm:
         endpoint: http://lgtm.observability.svc.cluster.local:4318

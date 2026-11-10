@@ -1,0 +1,16 @@
+# Fault-controller probe: lets the controller confirm a flag took effect.
+# Lives in the chaos-mesh namespace, which the agent's tools never see.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fault-probe
+  namespace: chaos-mesh
+  labels: {app: fault-probe}
+spec:
+  containers:
+    - name: curl
+      image: curlimages/curl:8.11.1
+      command: ["sleep", "infinity"]
+      resources:
+        requests: {memory: 8Mi, cpu: 5m}
+        limits: {memory: 32Mi}

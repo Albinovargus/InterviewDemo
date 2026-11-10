@@ -158,8 +158,8 @@ def _signals(services: list[str]) -> dict[str, str]:
         "p95 latency ms": f'1000 * histogram_quantile(0.95, sum by (service, le)(rate(traces_spanmetrics_latency_bucket{{service=~"{sel}",span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER"}}[1m])))',
         "client error rate": f'sum by (service)(rate(traces_spanmetrics_calls_total{{service=~"{sel}",span_kind=~"SPAN_KIND_CLIENT|SPAN_KIND_PRODUCER",status_code="STATUS_CODE_ERROR"}}[1m]))',
         "restarts": f'sum by (service)(label_replace(k8s_container_restarts{{k8s_namespace_name="otel-demo"}}, "service", "$1", "k8s_container_name", "({sel})"))',
-        "memory MiB": f'sum by (service)(label_replace(k8s_container_memory_working_set_bytes{{k8s_namespace_name="otel-demo"}}, "service", "$1", "k8s_container_name", "({sel})")) / 1048576',
-        "consumer lag": 'sum by (service)(label_replace(kafka_consumer_group_lag, "service", "$1", "group", "(.*)"))',
+        "memory MiB": f'sum by (service)(label_replace(container_memory_working_set_bytes{{k8s_namespace_name="otel-demo"}}, "service", "$1", "k8s_container_name", "({sel})")) / 1048576',
+        "consumer lag": 'sum by (service)(label_replace(kafka_consumer_group_lag_sum_ratio, "service", "$1", "group", "(.*)"))',
     }
 
 
