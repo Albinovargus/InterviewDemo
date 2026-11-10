@@ -104,3 +104,9 @@ def test_map_json_round_trip():
                    captured_at=123.0, window_s=3600)
     again = ServiceMap.from_json(m.to_json())
     assert again == m
+
+
+def test_directed_request_flow_keeps_its_orientation():
+    # OBI marks request bytes; src is then the caller even when both sides have Services.
+    edges = reconcile([], [Flow("product-catalog", "astronomy-db", 300.0, directed=True)], INVENTORY)
+    assert ("product-catalog", "astronomy-db") in by_pair(edges)

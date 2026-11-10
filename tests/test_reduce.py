@@ -60,3 +60,22 @@ def test_handles_are_short_and_stable():
 def test_no_data_marker_is_explicit():
     assert "no data" in NO_DATA.lower()
     assert "not" in NO_DATA.lower() and "healthy" in NO_DATA.lower()
+
+
+from noc.reduce import template, count_templates
+
+
+def test_template_masks_variable_parts():
+    assert template("Charge request 7f3a9c21-1b2c-4d5e-8f90-1234567890ab for 42.50 USD") == "Charge request <_> for <_> USD"
+    assert template("GET /api/products/OLJCESPC7Z 200 in 13ms") == "GET /api/products/<_> <_> in <_>"
+    assert template("connected to 10.244.0.12:5432") == "connected to <_>"
+
+
+def test_template_keeps_words_and_settings_without_digits():
+    line = "Payment request failed. Invalid token. demo.user_context.loyalty_level=gold"
+    assert template(line) == line
+
+
+def test_count_templates_groups_lines():
+    lines = ["order 1 placed", "order 22 placed", "cache miss for user 9", "order 3 placed"]
+    assert count_templates(lines) == {"order <_> placed": 3, "cache miss for user <_>": 1}

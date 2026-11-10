@@ -119,3 +119,32 @@ class Handles:
 
     def full(self, handle: str) -> str | None:
         return self._rev.get(handle)
+
+
+# ---- log templating ---------------------------------------------------------------
+
+_DIGIT = __import__("re").compile(r"\d")
+
+
+def _mask(tok: str) -> str:
+    if not _DIGIT.search(tok):
+        return tok
+    if "=" in tok and not tok.startswith("="):
+        k, _, v = tok.partition("=")
+        return f"{k}={_mask(v)}"
+    if "/" in tok:
+        return "/".join(_mask(p) if p else p for p in tok.split("/"))
+    return "<_>"
+
+
+def template(line: str, max_len: int = 240) -> str:
+    """Collapse a log line to its template: any token containing a digit becomes <_>."""
+    return " ".join(_mask(t) for t in line.strip().split())[:max_len]
+
+
+def count_templates(lines: list[str]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for ln in lines:
+        t = template(ln)
+        out[t] = out.get(t, 0.0) + 1
+    return out

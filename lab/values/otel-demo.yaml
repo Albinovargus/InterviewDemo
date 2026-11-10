@@ -11,6 +11,11 @@ components:
   chatbot: {enabled: false}
   mcp: {enabled: false}
   telemetry-docs: {enabled: false}
+  load-generator:
+    # 25 simulated shoppers (chart default 5): every service, including payment
+    # and checkout, then sees steady traffic, so error-rate alerts do not flap.
+    envOverrides:
+      - {name: LOCUST_USERS, value: "25"}
   frontend-proxy:
     service:
       type: NodePort

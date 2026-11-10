@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from noc import clients, livemap
-from noc.reduce import NO_DATA, Handles, approx_tokens, fit, movers, pattern_diff
+from noc.reduce import NO_DATA, Handles, approx_tokens, count_templates, fit, movers, pattern_diff, template
 from noc.servicemap import ServiceMap, compare
 
 BUDGET = 3500  # tokens per tool result, well under Claude Code's 10k warning
@@ -138,8 +138,9 @@ def what_changed(minutes_before_first_alert: int = 30) -> dict:
               or e["kind"] in ("Deployment", "ReplicaSet")]
     for e in events:
         e["time"] = _ago(e["time"])
-    rollouts = clients.recent_rollouts(since)
+    rollouts, r_note = fit(clients.recent_rollouts(since), 700, "narrow minutes_before_first_alert")
     ev_kept, note = fit(events, 1500, "narrow minutes_before_first_alert")
+    note = note or r_note
     out = {"since": _ago(since), "commits": commits, "rollouts": rollouts, "kubernetes_events": ev_kept,
            "summary": f"{len(commits)} commits, {len(rollouts)} rollouts, {len(events)} notable Kubernetes events"}
     if note:
@@ -205,35 +206,42 @@ def metric_movers(services: list[str] | None = None, window_minutes: int = 15) -
 
 # ---- 5. log_pattern_diff --------------------------------------------------------------------
 
-def _pattern_counts(service: str, start: float, end: float) -> dict[str, float]:
-    out: dict[str, float] = {}
-    for p in clients.loki_patterns(f'{{service_name="{service}"}}', start, end):
-        out[p["pattern"]] = out.get(p["pattern"], 0.0) + sum(float(c) for _, c in p.get("samples", []))
-    return out
+LINE_CAP = 5000  # lines templated per window; counts above this are sampled, and the result says so
 
 
 def log_pattern_diff(service: str, window_minutes: int = 15) -> dict:
     (b0, b1), (i0, i1) = _windows(window_minutes)
     sel = f'{{service_name="{service}"}}'
-    scanned = int(clients.loki_count(sel, i0, i1) + clients.loki_count(sel, b0, b1))
-    base, now = _pattern_counts(service, b0, b1), _pattern_counts(service, i0, i1)
+    n_base, n_inc = int(clients.loki_count(sel, b0, b1)), int(clients.loki_count(sel, i0, i1))
+    base_lines = clients.loki_lines(sel, b0, b1, limit=LINE_CAP)
+    inc_lines = clients.loki_lines(sel, i0, i1, limit=LINE_CAP)
+    base, now = count_templates(base_lines), count_templates(inc_lines)
+    # Scale sampled windows so the two counts stay comparable.
+    if base_lines and n_base > len(base_lines):
+        base = {k: v * n_base / len(base_lines) for k, v in base.items()}
+    if inc_lines and n_inc > len(inc_lines):
+        now = {k: v * n_inc / len(inc_lines) for k, v in now.items()}
     changes = pattern_diff(base, now)
+    examples: dict[str, list[str]] = {}
+    for ln in inc_lines:
+        t = template(ln)
+        if len(examples.setdefault(t, [])) < 3:
+            examples[t].append(ln[:300])
     rows = []
     for c in changes[:8]:
-        row = {"pattern": c.pattern[:240], "status": c.status, "baseline_count": int(c.baseline_count),
-               "incident_count": int(c.incident_count)}
-        if len(rows) < 3 and c.status != "vanished":
-            try:
-                row["examples"] = [ln[:300] for ln in clients.loki_lines(f'{sel} |> `{c.pattern}`', i0, i1, limit=3)]
-            except clients.QueryError:
-                row["examples"] = []
+        row = {"pattern": c.pattern, "status": c.status, "baseline_count": int(round(c.baseline_count)),
+               "incident_count": int(round(c.incident_count))}
+        if c.status != "vanished" and len(rows) < 4:
+            row["examples"] = examples.get(c.pattern, [])
         rows.append(row)
     kept, note = fit(rows, BUDGET - 300, "ask for a narrower window_minutes")
     out = {"service": service, "baseline_window": f"{_ago(b0)}–{_ago(b1)}",
            "incident_window": f"{_ago(i0)}–{_ago(i1)}", "changes": kept,
-           "counts": {"scanned_log_lines": scanned, "patterns": len(set(base) | set(now)),
+           "counts": {"scanned_log_lines": n_base + n_inc, "patterns": len(set(base) | set(now)),
                       "anomalous": len(changes), "returned": len(kept)}}
-    if not base and not now:
+    if n_base > LINE_CAP or n_inc > LINE_CAP:
+        out["sampling"] = f"templated the most recent {LINE_CAP} lines per window; counts scaled to the full volume"
+    if not base_lines and not inc_lines:
         out["message"] = NO_DATA
     elif not changes:
         out["message"] = "Log patterns match the baseline: nothing new, spiking or vanished."

@@ -11,12 +11,12 @@ locals {
     ErrorRateHigh = {
       severity = "critical"
       summary  = "{{ $labels.service }}: more than 5% of requests are failing"
-      expr     = "(sum by (service)(rate(${local.calls}{${local.server}, status_code=\"STATUS_CODE_ERROR\"}[2m])) / sum by (service)(rate(${local.calls}{${local.server}}[2m]))) > 0.05 and on (service) sum by (service)(rate(${local.calls}{${local.server}}[2m])) > 0.02"
+      expr     = "(sum by (service)(rate(${local.calls}{${local.server}, status_code=\"STATUS_CODE_ERROR\"}[3m])) / sum by (service)(rate(${local.calls}{${local.server}}[3m]))) > 0.05 and on (service) sum by (service)(rate(${local.calls}{${local.server}}[3m])) > 0.003"
     }
     DownstreamCallErrors = {
       severity = "warning"
       summary  = "{{ $labels.service }}: calls to its dependencies are failing"
-      expr     = "sum by (service)(rate(${local.calls}{${local.client}, status_code=\"STATUS_CODE_ERROR\"}[2m])) > 0.02"
+      expr     = "sum by (service)(rate(${local.calls}{${local.client}, status_code=\"STATUS_CODE_ERROR\"}[3m])) > 0.01"
     }
     LatencyHigh = {
       severity = "warning"
@@ -57,6 +57,8 @@ resource "grafana_rule_group" "noc" {
       name           = rule.key
       condition      = "B"
       for            = "1m"
+      # Hold an alert through a brief dip so a low-traffic signal does not flap.
+      keep_firing_for = "3m"
       no_data_state  = "OK"
       exec_err_state = "OK"
       labels         = { severity = rule.value.severity, team = "noc" }
