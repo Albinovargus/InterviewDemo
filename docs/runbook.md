@@ -56,6 +56,8 @@ If the console window was closed: `uv run python -m noc.console`.
 - **The data counter is small in the lab.** The lab is 18 services at about 25 requests a second, so the counter shows thousands of rows, not millions. What scales is the other side: every tool answer is capped at about 3,500 tokens however much it reads.
 - **Log patterns are computed by our reduction layer**, by templating Loki log lines in code (tested), not by Loki's pattern ingester, which returned nothing for low-volume services.
 - **Replays are real recorded runs**, replayed at the speed shown in the badge (gaps longer than 20 s are shortened).
+- **Two of the seven faults are off the menu.** In rehearsal, `db-lock` (the demo's lock-contention flag) had no measurable effect, and `dns-failure` never failed a lookup because shipping keeps its connection to quote open. Their buttons are disabled with the reason, and the scorecard lists them. Say so plainly: "faults that failed rehearsal came off the menu."
+- **The demo app logs its own feature flags.** For flag faults (payment, Kafka, cache) the agent can find the flag name in the service's own logs, just as a real flag-change log would show it. The fault tooling itself (Chaos Mesh, flagd's pod) is hidden from the change tool.
 - **Cost is the API-equivalent price** that Claude Code reports for the run. The demo itself runs on a Claude subscription.
 
 ## Recovering

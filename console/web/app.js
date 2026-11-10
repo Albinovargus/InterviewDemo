@@ -398,7 +398,8 @@ function jobLine() {
   if (j.state === "error") return `Failed: ${j.message || "unknown error"}`;
   if (j.state === "done" && j.action === "inject") return `${j.fault} injected at ${clock(j.at)}. Alerts usually fire within 1–3 minutes.`;
   if (j.state === "done" && j.action === "reset") return `Lab reset at ${clock(j.at)}.`;
-  return "Pick a fault. The agent is never told which one.";
+  const off = S.faults.filter((f) => f.excluded).length;
+  return `Pick a fault. The agent is never told which one.${off ? ` Greyed out: ${off} that failed rehearsal (hover for why).` : ""}`;
 }
 async function inject(id) {
   try { S.job = await api(`/api/faults/${encodeURIComponent(id)}`, { method: "POST" }); renderFaultBar(); }
