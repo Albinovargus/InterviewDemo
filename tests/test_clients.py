@@ -43,3 +43,15 @@ def test_reduction_tools_refuse_the_fault_tooling():
     for fn in (tools.log_pattern_diff, tools.trace_examples):
         out = fn("flagd")
         assert "error" in out and "tooling" in out["error"]
+
+
+def test_trace_examples_drops_spans_that_call_the_fault_tooling(monkeypatch):
+    from noc import tools
+    monkeypatch.setattr(tools.clients, "tempo_search", lambda q, a, b, limit=3: [{"traceID": "t1", "rootServiceName": "payment"}])
+    monkeypatch.setattr(tools.clients, "tempo_trace", lambda tid: {})
+    rows = [{"id": "1", "service": "payment", "span": "Charge", "kind": "server", "ms": 2.0, "error": True, "message": "Invalid token"},
+            {"id": "2", "service": "payment", "span": "flagd.evaluation.v2.Service/EventStream", "kind": "client", "ms": 4.0, "error": False, "message": ""}]
+    monkeypatch.setattr(tools, "_span_rows", lambda trace: rows)
+    out = tools.trace_examples("payment")
+    assert "flagd" not in str(out["examples"])
+    assert out["examples"][0]["spans"][0]["span"] == "Charge"

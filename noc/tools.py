@@ -303,7 +303,7 @@ def trace_examples(service: str, only_errors: bool = True, limit: int = 3) -> di
     examples = []
     for t in found:
         rows = [r for r in _span_rows(clients.tempo_trace(t["traceID"]))
-                if not any(h in r["service"] for h in clients.HIDDEN_WORKLOADS)]
+                if not any(h in f'{r["service"]} {r["span"]}' for h in clients.HIDDEN_WORKLOADS)]
         errs = [r for r in rows if r["error"]]
         focus = errs or [r for r in rows if r["service"] == service][:5]
         keep = (rows[:4] + focus[:6]) if len(rows) > 10 else rows
