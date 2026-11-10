@@ -1,0 +1,19 @@
+# Fault: network delay on the PostgreSQL pod. Every service that uses the
+# database slows down; the database itself reports no errors.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: pg-delay
+  namespace: chaos-mesh
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [otel-demo]
+    labelSelectors:
+      app.kubernetes.io/component: astronomy-db
+  delay:
+    latency: "400ms"
+    jitter: "50ms"
+    correlation: "25"
+  direction: to

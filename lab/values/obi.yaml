@@ -13,11 +13,12 @@ config:
             capture:
               enabled: true
               filters:
-                metrics:
+                metrics: &filters
                   k8s_src_owner_name:
                     not_match: '{kube*,*prometheus*,*grafana-agent*}'
                   k8s_dst_owner_name:
                     not_match: '{kube*,*prometheus*,*grafana-agent*}'
+                traces: *filters
         enrich:
           enrichers:
             kubernetes:
@@ -30,3 +31,12 @@ config:
               otlp_http:
                 encoding: protobuf
                 endpoint: http://lgtm.observability.svc.cluster.local:4318
+    tracer_provider:
+      processors:
+        - batch:
+            exporter:
+              otlp_grpc:
+                endpoint: http://lgtm.observability.svc.cluster.local:4317
+                tls:
+                  insecure: true
+            schedule_delay: 15000

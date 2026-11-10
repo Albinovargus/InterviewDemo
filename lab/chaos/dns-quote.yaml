@@ -1,0 +1,18 @@
+# Fault: DNS lookups of "quote" fail for its caller (shipping). Shipping reports
+# connection errors; quote itself looks perfectly healthy.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: dns-quote
+  namespace: chaos-mesh
+spec:
+  action: error
+  mode: all
+  patterns:
+    - quote
+    - quote.otel-demo
+    - quote.otel-demo.svc.cluster.local
+  selector:
+    namespaces: [otel-demo]
+    labelSelectors:
+      app.kubernetes.io/component: shipping

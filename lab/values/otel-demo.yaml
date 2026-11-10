@@ -17,8 +17,6 @@ components:
       nodePort: 30080
 
 opentelemetry-collector:
-  command:
-    extraArgs: []
   config:
     exporters:
       otlp_http/lgtm:
@@ -35,4 +33,5 @@ opentelemetry-collector:
           exporters: [otlp_http/lgtm]
         logs:
           exporters: [otlp_http/lgtm]
-        profiles: null
+        profiles:
+          exporters: [debug]
