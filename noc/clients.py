@@ -155,16 +155,42 @@ def _parse_ts(ts: str | None) -> float:
 
 # ---- Git (the change record) -------------------------------------------------
 
-def git_log(since_s: float, paths: tuple[str, ...] = ("lab",)) -> list[dict]:
+def git_log(since_s: float, repo: Path) -> list[dict]:
     fmt = "%H%x1f%ct%x1f%an%x1f%s"
-    p = subprocess.run(["git", "-C", str(ROOT), "log", f"--since={int(since_s)} seconds ago", f"--format={fmt}",
-                        "--name-only", "--", *paths], capture_output=True, text=True, timeout=15)
-    commits, cur = [], None
+    p = subprocess.run(["git", "-C", str(repo), "log", f"--since={int(since_s) + 1} seconds ago", f"--format={fmt}"],
+                       capture_output=True, text=True, timeout=15)
+    commits = []
     for line in p.stdout.splitlines():
         if "\x1f" in line:
             h, ct, an, subj = line.split("\x1f")
-            cur = {"commit": h[:8], "time": float(ct), "author": an, "subject": subj, "files": []}
-            commits.append(cur)
-        elif line.strip() and cur is not None:
-            cur["files"].append(line.strip())
+            commits.append({"commit": h[:8], "time": float(ct), "author": an, "subject": subj})
     return commits
+
+
+def git_show_stat(commit: str, repo: Path, max_lines: int = 20) -> str:
+    p = subprocess.run(["git", "-C", str(repo), "show", "--format=", "--unified=0", commit],
+                       capture_output=True, text=True, timeout=15)
+    lines = [ln for ln in p.stdout.splitlines() if ln.startswith(("+", "-")) and not ln.startswith(("+++", "---"))]
+    return "\n".join(lines[:max_lines])
+
+
+def recent_rollouts(since: float) -> list[dict]:
+    """ReplicaSets created after `since`: each one is a Deployment rollout or scale-up of a new template."""
+    out = []
+    for ns in ("otel-demo", "default"):
+        for rs in kubectl_json("get", "replicasets", "-n", ns)["items"]:
+            t = _parse_ts(rs["metadata"].get("creationTimestamp"))
+            owner = (rs["metadata"].get("ownerReferences") or [{}])[0].get("name", "")
+            if t >= since and not any(h in owner for h in HIDDEN_WORKLOADS):
+                out.append({"time": time.strftime("%H:%M:%S UTC", time.gmtime(t)), "deployment": owner,
+                            "replicaset": rs["metadata"]["name"], "replicas": rs["spec"].get("replicas", 0)})
+    for ns in ("otel-demo",):
+        for d in kubectl_json("get", "deployments", "-n", ns)["items"]:
+            for c in d.get("status", {}).get("conditions", []):
+                t = _parse_ts(c.get("lastUpdateTime"))
+                name = d["metadata"]["name"]
+                if (c.get("type") == "Progressing" and c.get("reason") == "NewReplicaSetAvailable" and t >= since
+                        and not any(h in name for h in HIDDEN_WORKLOADS)):
+                    out.append({"time": time.strftime("%H:%M:%S UTC", time.gmtime(t)), "deployment": name,
+                                "event": "rollout completed", "replicas": d["spec"].get("replicas")})
+    return out

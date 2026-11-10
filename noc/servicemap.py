@@ -29,6 +29,7 @@ class Flow:
     a: str
     b: str
     bytes_rate: float
+    directed: bool = False  # True when OBI marked these bytes as requests: a is then the caller
 
 
 @dataclass(frozen=True)
@@ -117,14 +118,17 @@ class ServiceMap:
         return next((e for e in self.edges if e.key == (caller, callee)), None)
 
 
-def _flow_pairs(flows: list[Flow]) -> dict[frozenset, float]:
+def _flow_pairs(flows: list[Flow]) -> tuple[dict[frozenset, float], dict[frozenset, tuple[str, str]]]:
     pairs: dict[frozenset, float] = {}
+    oriented: dict[frozenset, tuple[str, str]] = {}
     for f in flows:
         if f.a == f.b:
             continue
         k = frozenset((f.a, f.b))
         pairs[k] = pairs.get(k, 0.0) + f.bytes_rate
-    return pairs
+        if f.directed:
+            oriented[k] = (f.a, f.b)
+    return pairs, oriented
 
 
 def _orient(a: str, b: str, inventory: dict[str, Workload]) -> tuple[str, str]:
@@ -145,7 +149,7 @@ def _orient(a: str, b: str, inventory: dict[str, Workload]) -> tuple[str, str]:
 
 
 def reconcile(trace_edges: list[TraceEdge], flows: list[Flow], inventory: dict[str, Workload]) -> list[Edge]:
-    pairs = _flow_pairs(flows)
+    pairs, oriented = _flow_pairs(flows)
     used: set[frozenset] = set()
     out: list[Edge] = []
 
@@ -175,7 +179,7 @@ def reconcile(trace_edges: list[TraceEdge], flows: list[Flow], inventory: dict[s
         if k in used or k in traced_pairs:
             continue
         a, b = sorted(k)
-        caller, callee = _orient(a, b, inventory)
+        caller, callee = oriented.get(k) or _orient(a, b, inventory)
         e = Edge(caller, callee, "network", flow_bytes=bytes_rate, sources={"flows"})
         e.evidence.append(f"flows: {bytes_rate:.0f} B/s, no traces")
         w = inventory.get(caller)

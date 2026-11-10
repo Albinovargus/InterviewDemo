@@ -21,6 +21,8 @@ spec:
   template:
     metadata:
       labels: {app: lgtm}
+      annotations:
+        checksum/tempo: {{ .Files.Get "files/tempo-config.yaml" | sha256sum }}
     spec:
       containers:
         - name: lgtm
@@ -48,9 +50,12 @@ spec:
             limits: {memory: 4Gi}
           volumeMounts:
             - {name: data, mountPath: /data}
+            - {name: tempo-config, mountPath: /otel-lgtm/tempo-config.yaml, subPath: tempo-config.yaml}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: lgtm-data}
+        - name: tempo-config
+          configMap: {name: lgtm-tempo-config}
 ---
 apiVersion: v1
 kind: Service
@@ -66,3 +71,11 @@ spec:
     - {name: tempo, port: 3200, targetPort: 3200, nodePort: {{ .Values.nodePorts.tempo }}}
     - {name: otlp-http, port: 4318, targetPort: 4318, nodePort: {{ .Values.nodePorts.otlpHttp }}}
     - {name: otlp-grpc, port: 4317, targetPort: 4317}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lgtm-tempo-config
+data:
+  tempo-config.yaml: |
+{{ .Files.Get "files/tempo-config.yaml" | indent 4 }}

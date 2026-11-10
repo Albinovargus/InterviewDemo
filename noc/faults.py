@@ -196,3 +196,33 @@ def reset_all() -> ResetReport:
         actions.append("reverted canary commit")
     left = residue(lab_state())
     return ResetReport(clean=not left, residue=left, actions=actions)
+
+
+def init_gitops() -> None:
+    """Create the change-record repo (idempotent) and apply the baseline canary (0 replicas)."""
+    if not (GITOPS / ".git").exists():
+        GITOPS.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(GITOPS)], check=True)
+        (GITOPS / CANARY_FILE).write_text((ROOT / "lab" / "manifests" / "canary" / CANARY_FILE).read_text())
+        _git("add", CANARY_FILE)
+        env_date = "2026-11-01T09:00:00Z"
+        subprocess.run(["git", "-C", str(GITOPS), "-c", "user.name=platform-bot",
+                        "-c", "user.email=platform-bot@example.invalid", "commit", "-q",
+                        "-m", "cart: add canary deployment (scaled to zero)"],
+                       check=True, env={**__import__("os").environ, "GIT_AUTHOR_DATE": env_date,
+                                        "GIT_COMMITTER_DATE": env_date})
+    _kubectl("apply", "-f", str(GITOPS / CANARY_FILE))
+
+
+if __name__ == "__main__":
+    import sys
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if cmd == "init":
+        init_gitops()
+        print("gitops ready")
+    elif cmd == "inject":
+        print(json.dumps(asdict(inject(sys.argv[2])), indent=2))
+    elif cmd == "reset":
+        print(json.dumps(asdict(reset_all()), indent=2))
+    else:
+        print(json.dumps(asdict(lab_state()), indent=2))
