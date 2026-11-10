@@ -1,3 +1,5 @@
+import json
+
 from noc.grade import grade
 
 
@@ -52,3 +54,18 @@ def test_summarise_counts_passes_and_medians_per_scenario():
     (s,) = summarise(rows)
     assert (s["passed"], s["runs"], s["median_s"], s["median_usd"], s["alerts"]) == (2, 3, 200, 2.0, 2)
     assert s["reasons"] == ["named checkout"]
+
+
+def test_scorecard_lists_off_menu_faults_with_their_reason(tmp_path, monkeypatch):
+    from noc import rehearse
+    monkeypatch.setattr(rehearse, "REPLAYS", tmp_path)
+    batch = tmp_path / "b.json"
+    batch.write_text(json.dumps([
+        {"scenario": "payment-failure", "passed": True, "reason": "named payment", "duration_s": 30, "cost_usd": 0.5,
+         "run": "r1", "model": "m", "effort": "high"}]))
+    sc = rehearse.scorecard(batch, {"db-lock": "no effect"})
+    ids = [r["id"] for r in sc["rows"]]
+    assert ids == ["payment-failure", "db-lock"]
+    off = sc["rows"][1]
+    assert off["on_menu"] is False and off["off_reason"] == "no effect" and off["runs"] == 0
+    assert sc["headline"] == "1 of 1 fault runs named the right cause"

@@ -1,0 +1,6 @@
+{
+  "off": {
+    "db-lock": "Off the menu: in rehearsal the flag had no measurable effect (product-catalog p95 stayed near 13 ms, no errors, no alert in 7 minutes).",
+    "dns-failure": "Off the menu: in rehearsal shipping kept its open connection to quote, so lookups never failed (quote's traffic was unchanged, no alert in 7 minutes)."
+  }
+}

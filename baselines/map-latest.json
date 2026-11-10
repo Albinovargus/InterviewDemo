@@ -1,0 +1,505 @@
+{
+  "captured_at": 1794291426.8101685,
+  "edges": [
+    {
+      "callee": "astronomy-db",
+      "caller": "accounting",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.08 req/s, 0% errors",
+        "flows: 994 B/s between the pods"
+      ],
+      "flow_bytes": 993.8253454866215,
+      "grade": "confirmed",
+      "kind": "db",
+      "p95_ms": 4.8,
+      "rate": 0.078,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "kafka",
+      "caller": "accounting",
+      "error_rate": 0.0,
+      "evidence": [
+        "flows: 2153 B/s, no traces"
+      ],
+      "flow_bytes": 2152.653460336563,
+      "grade": "likely",
+      "kind": "network",
+      "p95_ms": null,
+      "rate": 0.0,
+      "sources": [
+        "flows"
+      ]
+    },
+    {
+      "callee": "valkey-cart",
+      "caller": "cart",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 1.59 req/s, 0% errors",
+        "flows: 1898 B/s between the pods"
+      ],
+      "flow_bytes": 1898.2378643764143,
+      "grade": "confirmed",
+      "kind": "db",
+      "p95_ms": 4.8,
+      "rate": 1.586,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "cart",
+      "caller": "checkout",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.14 req/s, 0% errors",
+        "flows: 540 B/s between the pods"
+      ],
+      "flow_bytes": 539.9506301156293,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.135,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "currency",
+      "caller": "checkout",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.16 req/s, 0% errors",
+        "flows: 747 B/s between the pods"
+      ],
+      "flow_bytes": 747.293887570687,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.159,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "email",
+      "caller": "checkout",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.07 req/s, 0% errors",
+        "flows: 619 B/s between the pods"
+      ],
+      "flow_bytes": 619.3493021888227,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.067,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "kafka",
+      "caller": "checkout",
+      "error_rate": 0.0,
+      "evidence": [
+        "flows: 288 B/s, no traces"
+      ],
+      "flow_bytes": 287.9419869668975,
+      "grade": "likely",
+      "kind": "network",
+      "p95_ms": null,
+      "rate": 0.0,
+      "sources": [
+        "flows"
+      ]
+    },
+    {
+      "callee": "payment",
+      "caller": "checkout",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.06 req/s, 0% errors",
+        "flows: 351 B/s between the pods"
+      ],
+      "flow_bytes": 350.84414296752664,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.062,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "product-catalog",
+      "caller": "checkout",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.13 req/s, 0% errors",
+        "flows: 1006 B/s between the pods"
+      ],
+      "flow_bytes": 1006.0755044685899,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.126,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "shipping",
+      "caller": "checkout",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.14 req/s, 0% errors",
+        "flows: 971 B/s between the pods"
+      ],
+      "flow_bytes": 970.6344919073049,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.135,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "kafka",
+      "caller": "fraud-detection",
+      "error_rate": 0.0,
+      "evidence": [
+        "flows: 1923 B/s, no traces"
+      ],
+      "flow_bytes": 1923.0116997052849,
+      "grade": "likely",
+      "kind": "network",
+      "p95_ms": null,
+      "rate": 0.0,
+      "sources": [
+        "flows"
+      ]
+    },
+    {
+      "callee": "ad",
+      "caller": "frontend",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.08 req/s, 0% errors",
+        "flows: 344 B/s between the pods"
+      ],
+      "flow_bytes": 343.5241344884883,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.079,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "cart",
+      "caller": "frontend",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.48 req/s, 0% errors",
+        "flows: 1357 B/s between the pods"
+      ],
+      "flow_bytes": 1357.0632440527068,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.483,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "checkout",
+      "caller": "frontend",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.07 req/s, 0% errors",
+        "flows: 435 B/s between the pods"
+      ],
+      "flow_bytes": 435.01227409175135,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 44.5,
+      "rate": 0.066,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "product-catalog",
+      "caller": "frontend",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.97 req/s, 0% errors",
+        "flows: 6667 B/s between the pods"
+      ],
+      "flow_bytes": 6666.602845948182,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 18.0,
+      "rate": 0.975,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "recommendation",
+      "caller": "frontend",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.08 req/s, 0% errors",
+        "flows: 381 B/s between the pods"
+      ],
+      "flow_bytes": 380.9413100114193,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.7,
+      "rate": 0.077,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "frontend",
+      "caller": "frontend-proxy",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 1.08 req/s, 0% errors",
+        "flows: 12491 B/s between the pods"
+      ],
+      "flow_bytes": 12490.90212864889,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 28.3,
+      "rate": 1.085,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "astronomy-db",
+      "caller": "nightly-sync-7f9c",
+      "error_rate": 0.0,
+      "evidence": [
+        "flows: 503 B/s, no traces",
+        "nightly-sync-7f9c: no owner label, no traces, no Service"
+      ],
+      "flow_bytes": 502.91295993654387,
+      "grade": "unexplained",
+      "kind": "network",
+      "p95_ms": null,
+      "rate": 0.0,
+      "sources": [
+        "flows"
+      ]
+    },
+    {
+      "callee": "astronomy-db",
+      "caller": "product-catalog",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 1.62 req/s, 0% errors",
+        "flows: 17740 B/s between the pods"
+      ],
+      "flow_bytes": 17740.445696546158,
+      "grade": "confirmed",
+      "kind": "db",
+      "p95_ms": 4.8,
+      "rate": 1.62,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "product-catalog",
+      "caller": "recommendation",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.11 req/s, 0% errors",
+        "flows: 3682 B/s between the pods"
+      ],
+      "flow_bytes": 3681.967683923333,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.109,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    },
+    {
+      "callee": "quote",
+      "caller": "shipping",
+      "error_rate": 0.0,
+      "evidence": [
+        "traces: 0.06 req/s, 0% errors",
+        "flows: 479 B/s between the pods"
+      ],
+      "flow_bytes": 478.5528196221357,
+      "grade": "confirmed",
+      "kind": "sync",
+      "p95_ms": 4.8,
+      "rate": 0.055,
+      "sources": [
+        "flows",
+        "traces"
+      ]
+    }
+  ],
+  "nodes": {
+    "accounting": {
+      "has_service": false,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "ad": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "astronomy-db": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "cart": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "checkout": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "currency": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "email": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "fraud-detection": {
+      "has_service": false,
+      "instrumented": false,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "frontend": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "frontend-proxy": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "kafka": {
+      "has_service": true,
+      "instrumented": false,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "nightly-sync-7f9c": {
+      "has_service": false,
+      "instrumented": false,
+      "kind": "Pod",
+      "labelled": false,
+      "namespace": "default"
+    },
+    "payment": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "product-catalog": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "quote": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "recommendation": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "shipping": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    },
+    "valkey-cart": {
+      "has_service": true,
+      "instrumented": true,
+      "kind": "Deployment",
+      "labelled": true,
+      "namespace": "otel-demo"
+    }
+  },
+  "window_s": 600
+}

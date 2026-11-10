@@ -674,9 +674,13 @@ async function renderScorecard(doc) {
   doc.innerHTML = `<div class="label">Rehearsal · ${esc(sc.model || "")} · ${esc(sc.generated_utc || "")}</div>
     <h2>${esc(sc.headline || "")}</h2>
     <table><thead><tr><th>Scenario</th><th>Passed</th><th>Median time</th><th>Median cost</th><th>Status</th></tr></thead><tbody>
-    ${(sc.rows || []).map((x) => `<tr><td>${esc(x.title)}<br><span class="hint">${esc(x.expect || "")}</span></td><td class="num">${x.passed} / ${x.runs}</td>
-      <td class="num">${esc(mmss(x.median_s))}</td><td class="num">${x.median_usd != null ? "$" + x.median_usd.toFixed(2) : "–"}</td>
-      <td><span class="pill ${x.on_menu === false ? "off" : x.passed === x.runs ? "pass" : "fail"}">${x.on_menu === false ? "off the menu" : x.passed === x.runs ? "pass" : "mixed"}</span></td></tr>`).join("")}
+    ${(sc.rows || []).map((x) => {
+      const off = x.on_menu === false;
+      const pill = off ? ["off", "off the menu"] : x.passed === x.runs ? ["pass", "pass"] : x.passed ? ["fail", "mixed"] : ["fail", "fail"];
+      return `<tr><td>${esc(x.title)}<br><span class="hint">${esc(off ? x.off_reason || "" : x.expect || "")}</span></td>
+      <td class="num">${x.runs ? `${x.passed} / ${x.runs}` : "–"}</td>
+      <td class="num">${x.median_s != null ? esc(mmss(x.median_s)) : "–"}</td><td class="num">${x.median_usd != null ? "$" + x.median_usd.toFixed(2) : "–"}</td>
+      <td><span class="pill ${pill[0]}">${pill[1]}</span></td></tr>`; }).join("")}
     </tbody></table><p class="hint" style="margin-top:12px">${esc(sc.method || "")}</p>`;
 }
 

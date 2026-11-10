@@ -40,7 +40,7 @@ def _get(url: str, params: dict | None = None, headers: dict | None = None, atte
         except httpx.HTTPError as e:
             last = f"{url} unreachable ({e.__class__.__name__}); the backend may be restarting, retry in 30 s"
         else:
-            if r.status_code < 500:
+            if r.status_code < 500 or "larger than max" in r.text:  # too big is not transient: no retry
                 if r.status_code >= 400:
                     raise QueryError(f"{url} returned {r.status_code}: {r.text[:300]}")
                 return r.json()
@@ -90,8 +90,17 @@ def loki_count(selector: str, start: float, end: float) -> float:
 
 
 def loki_lines(selector: str, start: float, end: float, limit: int = 3) -> list[str]:
-    d = _get(f"{LOKI}/loki/api/v1/query_range", {"query": selector, "start": f"{int(start * 1e9)}",
-                                                 "end": f"{int(end * 1e9)}", "limit": limit, "direction": "backward"})
+    """Most recent lines first. A window too big for Loki's 4 MB gRPC cap is retried with half the lines."""
+    while True:
+        try:
+            d = _get(f"{LOKI}/loki/api/v1/query_range", {"query": selector, "start": f"{int(start * 1e9)}",
+                                                         "end": f"{int(end * 1e9)}", "limit": limit,
+                                                         "direction": "backward"})
+            break
+        except QueryError as e:
+            if "larger than max" not in str(e) or limit <= 250:
+                raise
+            limit //= 2
     lines = []
     for stream in d["data"]["result"]:
         for _, line in stream["values"]:
@@ -139,6 +148,15 @@ def kubectl_json(*args: str) -> dict:
     return json.loads(p.stdout)
 
 
+def _hidden_event(ev: dict) -> bool:
+    """Events from the fault tooling itself (Chaos Mesh, flagd) would tell the agent the answer."""
+    obj = ev.get("involvedObject", {})
+    if any(h in obj.get("name", "") for h in HIDDEN_WORKLOADS):
+        return True
+    src = f'{ev.get("source", {}).get("component", "")} {ev.get("reportingComponent", "")}'
+    return ("chaos" in f'{obj.get("apiVersion", "")} {obj.get("kind", "")} {src} {ev.get("message", "")}'.lower())
+
+
 def kube_events(since_s: float) -> list[dict]:
     out = []
     cutoff = time.time() - since_s
@@ -147,7 +165,7 @@ def kube_events(since_s: float) -> list[dict]:
             ts = ev.get("lastTimestamp") or ev.get("eventTime") or ev["metadata"].get("creationTimestamp")
             t = _parse_ts(ts)
             name = ev["involvedObject"].get("name", "")
-            if t >= cutoff and not any(h in name for h in HIDDEN_WORKLOADS):
+            if t >= cutoff and not _hidden_event(ev):
                 out.append({"time": t, "namespace": ns, "kind": ev["involvedObject"].get("kind"),
                             "object": name, "reason": ev.get("reason"), "message": (ev.get("message") or "")[:200],
                             "type": ev.get("type")})
